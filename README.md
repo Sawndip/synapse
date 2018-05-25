@@ -1,4 +1,4 @@
-![synapse](/home/frans/mice/synapse/doc/logo.png)
+![synapse](https://francois-drielsma.github.io/synapse/logo.png)
 
 # 1. About
 
@@ -303,7 +303,7 @@ Density estimation package
 # 8. Latest version updates
 
 Version **0.5.3**
-  - Added an data extractor (Extractor)
+  - Added a data extractor (Extractor)
   - Added a drawing assistant (Drawer) to replace the old plot tools (removed)
   - Optimized the amplitude algorithm (Amplitudes.cc)
   - Optimized the profile algorithm (Profiles.cc)
