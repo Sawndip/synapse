@@ -9,15 +9,16 @@ novel in accelerator physics.
 
 This package was developed with the intention of measuring the
 evolution of the transverse phase space of muons across an absorber
-in the context of the [Muon Ionization Cooling Experiment (MICE)]
-(http://mice.iit.edu). The experiment measures the phase space of 
+in the context of the 
+[Muon Ionization Cooling Experiment (MICE)](http://mice.iit.edu).
+The experiment measures the phase space of 
 individual beam muons before and after passing through the absorber 
 and builds ensembles at the analysis level. Beam non linearties and
 transmission losses experienced in the magnetic channel
 motivated the development of non-standard phase space density 
 estimation techniques. The techniques rely on the concept of
-particle amplitude and [nonparametric density etimation]
-(https://en.wikipedia.org/wiki/Nonparametric_statistics).
+particle amplitude and 
+[nonparametric density etimation](https://en.wikipedia.org/wiki/Nonparametric_statistics).
 Support was added for G4Beamline ASCII output in order
 to broaden the scope of the package.
 
@@ -71,7 +72,7 @@ with N the number of cores you want to build with. Set the flag to
 the code.
 
 ## 2.3. C++ API reference
-Browse the Doxygen [documentation](https://francois-drielsma.github.io/synapse).
+Browse the [Doxygen documentation](https://francois-drielsma.github.io/synapse).
 
 --------------------
 
