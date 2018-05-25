@@ -1,15 +1,45 @@
-# Introduction
+![synapse](/home/frans/mice/synapse/doc/logo.png)
+
+# 1. About
 
 The Synergistic Analysis of Phase Space Evolution (**SynAPSE**)
-provides support for a broad array of particle beam phase
-space characterization methods.
+framework provides support for a broad array of particle beam
+phase space density characterization methods, both common and
+novel in accelerator physics.
+
+This package was developed with the intention of measuring the
+evolution of the transverse phase space of muons across an absorber
+in the context of the [Muon Ionization Cooling Experiment (MICE)]
+(http://mice.iit.edu). The experiment measures the phase space of 
+individual beam muons before and after passing through the absorber 
+and builds ensembles at the analysis level. Beam non linearties and
+transmission losses experienced in the magnetic channel
+motivated the development of non-standard phase space density 
+estimation techniques. The techniques rely on the concept of
+particle amplitude and [nonparametric density etimation]
+(https://en.wikipedia.org/wiki/Nonparametric_statistics).
+Support was added for G4Beamline ASCII output in order
+to broaden the scope of the package.
+
+This code is aimed at measuring and outputting a broad array 
+of beam parameters (thoroughly described in the following),
+provided with a set phase space coordinate measurements,
+i.e. (x, y, px, py, pz), of a beam at a single or a set
+of z positions along the beam line. The framework measures the evolution
+of those parameters along the beam line and produces summary
+graphs for each of them.
+
+The package uniquely supports a wide array of non parametric
+density estimators that may be used to evaluate the probability
+density functions of the beams in 2D, 4D or 5D phase space. This
+allows for the unbiased evaluation of beam volumes, local densities and
+distributions of filamented beams in phase space.
 
 --------------------
---------------------
 
-# Installation
+# 2. Installation
 
-## Prerequisites
+## 2.1. Prerequisites
 
 The following are required to build the SynAPSE framework:
   - GCC 4.6.4 and above (C++11);
@@ -23,10 +53,7 @@ The following are provided with the SynAPSE framework:
 The following is optional but required to import MAUS data:
   - [MAUS](https://launchpad.net/maus) 2.8.3 and above.
 
- 
---------------------
-
-## Build
+## 2.2. Build
 
 First, if you want to import MAUS data, source the MAUS environment
 
@@ -43,44 +70,14 @@ with N the number of cores you want to build with. Set the flag to
 '**true**' if you require to use the MAUS third party gcc to build
 the code.
 
---------------------
---------------------
-
-# Presentation
-
-## Intended use
-
-This package was developed with the intention of measuring the
-evolution of the transverse phase space of muons across an absorber
-in the context of the Muon Ionization Cooling Experiment (MICE).
-The experiment measures the phase space of individual beam muons before
-and after passing through the absorber and builds ensembles at the
-analysis level. Beam non linearties observed in the magnetic channel
-motivated the development of non-standard phase space density 
-estimation techniques. Support was added for G4Beamline output in order
-to broaden the scope of the package.
-
-This code is aimed at measuring and outputting a broad array 
-of beam parameters (thoroughly described in the following),
-provided with a set phase space coordinate measurements,
-i.e. \f$(x, p_x, y, p_y, p_z)\f$, of a beam.
-
-The framework measures the evolution of those parameters along
-the beam line and produces summary graphs for each of them.
-
-The package uniquely supports a wide array of non parametric
-density estimators that may be used to evaluate the probability
-density functions of the beams in 2D, 4D or 5D phase space. This
-allows for the unbiased evaluation of beam volumes, local densities and
-distributions of filamented beams in phase space.
-
-All the algorithms may be found in
-
-    bin/
+## 2.3. C++ API reference
+Browse the Doxygen [documentation](https://francois-drielsma.github.io/synapse).
 
 --------------------
 
-## Global variables
+# 3. Structure
+
+## 3.1. Global variables
 
 The default global variables used by the framework are specified in the
 ConfiguratioDefaults.txt file. If the variables are changed in
@@ -109,15 +106,13 @@ Running the program with the option --verbose or -v will print out the
 debugging information when the program is ran by rerouting the Pitch::debug
 to std::out.
 
---------------------
-
-## Input
+## 3.2. Input
 
 Currently there are two supported data structure:
   - MAUS ROOT TTree data structure;
   - G4BL ASCII output structure.
 
-### MAUS
+### 3.2.1. MAUS
 
 The MAUS output data structure may be imported in three different ways.\n
 
@@ -149,7 +144,7 @@ It imports the Monte Carlo truth only and does not apply any selection criteria.
 This is useful for minimal simulations that e.g. only include virtual planes, fields
 and an absorber.
 
-### G4Beamline
+### 3.2.2. G4Beamline
 
 ImportG4BL.cc is exectuted as follows:
 
@@ -157,7 +152,7 @@ ImportG4BL.cc is exectuted as follows:
 
 It imports the G4Beamline simulation truth and does not apply any selection criteria.
 
-### Output
+### 3.2.3. Output
 The output of the importers is a single ROOT file structured as follows
   - One TNtuple (Data) that contains the real MICE data;
   - One TNtuple (RecMC) that contains the reconstructed Monte Carlo (digitized);
@@ -179,14 +174,16 @@ Any of the four trees may be left empty when filled and the
 emittance code will proceed accordingly. Specify which data type is
 requested in the datacards.
 
+###
+
 --------------------
 
-## Main algorithms
+# 4. Main algorithms
 
 All the following algorithms support an identical data structure
 and are strictly ran on the imported data.
 
-### Phase space
+## 4.1. Phase space
 
 PhaseSpace.cc is executed as follows
 
@@ -195,18 +192,18 @@ PhaseSpace.cc is executed as follows
 It reconstructs the evolution of several beam phase space summary
 statistics along the beam line. The parameters include
   - Twiss parameters: &alpha;, &beta; and &gamma;;
-  - mecanical angular momentum \f$L\f$;
-  - normalised transverse emittance \f$\epsilon_\perp\f$;
+  - mecanical angular momentum L;
+  - normalised transverse emittance &epsilon;<sub>&perp;</sub>;
   - transmission;
   - mean total momentum;
-  - &alpha;-amplitude \f$A_\alpha\f$;
-  - &alpha;-subemittance \f$e_\alpha\f$;
-  - &alpha;-fractional emittance \f$\epsilon_\alpha\f$.
+  - &alpha;-amplitude A<sub>&alpha;</sub>;
+  - &alpha;-subemittance e<sub>&alpha;</sub>;
+  - &alpha;-fractional emittance &epsilon;<sub>&alpha;</sub>.
 
 All the quantities are provided with a measurement uncertainty (if
 the data has been reconstructed) and a statistical uncertainty. The 
 quantities are computed and compiled in a single Beam class built
-for each \f$z\f$ position at which the beam is sampled.
+for each z position at which the beam is sampled.
 
 If the '**mice**' flag is set to 1 in the datacards, the default MICE beam line
 elements will be drawn on the canvases along with a information box that specifies
@@ -226,7 +223,7 @@ The other datacards that apply to the algorithm are defined as
 For a definition of &alpha;-amplitude, subemittance and fractional
 emittance, see https://pos.sissa.it/295/099/.
 
-### Amplitudes
+## 4.2. Amplitudes
 
 Amplitudes.cc is executed as follows
 
@@ -249,25 +246,31 @@ If the flag '**voronoi**' is true, the distribution of Voronoi tesselation
 cell volumes is reconstructed upstream and downstream of the absorber. It
 is time intensive in four dimensions.
 
---------------------
+## 4.3. Phase space profiles
 
-## Tools
+## 4.4. Density profiles
 
---------------------
-
-## Toy Monte Carlo
+## 4.5. Beam reweighting routine
 
 --------------------
 
-## Backend packages
+# 5. Tools
 
-### Exception handler
+--------------------
+
+# 6. Toy Monte Carlo
+
+--------------------
+
+# 7. Backend packages
+
+## 7.1 Exception handler
 
 Propriatary exception handling and output stream
   - Produces an accurate description of any exceptions (Exceptions);
   - Redirects the output stream of different classes of messages (Pitch).
 
-### Mathematics package
+## 7.2 Mathematics package
 
 The mathematics package includes
   - Linear algebra (Matrix, Vector, DecompLU, DecompQR);
@@ -275,7 +278,7 @@ The mathematics package includes
   - Statistics package (Statistics.hh);
   - Broad set of n-dimensional distribution types (Gaus, Exponential, Uniform, etc.)
 
-### Density estimation package
+## 7.3. Density estimation package
 
 Density estimation package
   - Broad array of non parametric density estimators:
@@ -296,9 +299,8 @@ Density estimation package
 
  
 --------------------
---------------------
 
-# Latest version updates
+# 8. Latest version updates
 
 Version **0.5.3**
   - Added an data extractor (Extractor)
