@@ -1,0 +1,8 @@
+*~
+.bzr*
+build/*
+bin/*
+lib/*
+doc/*
+third_party/*
+

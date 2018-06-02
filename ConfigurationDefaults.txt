@@ -1,0 +1,77 @@
+# Current setting
+geometry_filename 	/home/frans/mice/synapse/bin/geometries/2017-02_7/ParentGeometryFile.dat			# Path to the geometry file
+user_cycle		2017/03		# ISIS user cycle
+run_name		7 		# Run name
+
+# Data type to be processed
+truth			1	# Truth processing flag (0/1)
+recmc			1	# Reconstructed MC processing flag (0/1)
+data			1	# Data processing flag (0/1)
+
+# Nonparametric density estimators option
+de			0	# Density estimation flag (0/1)
+de_algo			knn	# Density estimation algorithm
+
+# Reconstruction options
+mice			1	# MICE beam line flag (0/1)
+frac			.09	# Fraction of the beam to consider
+min_vid			47	# ID of the first virtual plane to consider (35)
+tku_vid			64	# Upstream virtual reference plane ID (36, 35, 52)
+abs_vid			71	# Absorber centre virtual plane ID
+tkd_vid			80	# Donwstream virtual reference plane ID (112, 135, 64)
+max_vid			96	# ID of the last virtual plane to consider (80)
+
+# Amplitude calculation options
+corrected		0	# Corrected amplitude flag (0/1)
+mcd			0	# Minimum Covariance Determinant amplitude flag (0/1)
+generalised		0	# Generalised density amplitude flag (0/1)
+significance		0	# Computes the excess significance (0/1)
+rebin			0	# Rebin the histogram with equal phase-space volumes (0/1)
+poincare		1	# Print the Poincare sections of the beam (0/1)
+voronoi			0	# Voronoi tesselation flag (0/1)
+
+# Import variables
+import_filename		import_2017-02_7_6mm_lih_pure_sim.root	# Name of the file produced by the importers
+chunked			1	# For a simulation divided in chunks, must offset the spills
+nvirtuals		150	# Number of virtual planes in the simulation (150, 90)
+aperture		-1	# Global radial aperture, MICE default if -1 [mm]
+do_pid			1	# Particle identification flag (0/1)
+fit_pid			0	# Fit the Tof01 profile to optain the boundaries (0/1)
+total_momentum_cut	1	# Cut on total momentum rather than pz (0/1)
+min_momentum		135	# Minimum accepted momentum [MeV/c]
+max_momentum		145	# Maximum accepted momentum [MeV/c]
+tkd_min_momentum	50	# Minimum accepted downstream momentum [MeV/c]
+tkd_max_momentum	200	# Maximum accepted downstream momentum [MeV/c]
+tracker_fiducial	150	# Fiducial radius of the trackers [mm]
+ref_vid			64	# Virtual plane ID at which to do the selection (52)
+notofs			1	# True if the simulation did not include the TOFs (0/1)
+through_part		0	# Only keep particle that do not scrape (0/1)
+diagnostics		1	# Produce diagnostic plots during importation (0/1)
+tof0_vid		11	# Virtual plane ID of the front of TOF0
+tof1_vid		32 #NO	# Virtual plane ID of the front of TOF1
+tkd3_vid		88	# Donwstream virtual station 3 plane ID
+tofmin			27	# Lower limit of the muon time-of-flight peak
+tofmax			32	# Upper limit of the muon time-of-flight peak
+compare_cut		all	# Level of cut to compare between data types
+
+# Reweighting parameters
+reweight_alg		0	# 0:most distant bin, 1:bin by bin
+reweight_metric		0	# 0:own metric, 1:data's metric
+
+# JSON Converter variables
+run_number		10000	# MAUS run number being conveted to JSON
+
+# Toy input beam parameters
+toy_mass		105.66	# Particle mass [MeV/c^2]
+toy_n			1e4	# Number of particles to generate
+toy_seed		-1	# Seed for beam production, -1 randomizes the seed
+toy_eps			2.5	# Input normalised emittance [mm]
+toy_mom			140	# Central momentum [MeV/c]
+toy_alpha		-2	# Optical alpha function at the absorber
+toy_beta		1300	# Optical beta function at the absorber [mm]
+
+# Toy physics processes
+toy_scat		1	# Turn on scattering in the absrober (0/1)
+toy_eloss		1	# Turn on energy loss in the absorber (0/1)
+toy_drift		0	# Length of the drift space after the absorber [mm]
+toy_sol			0	# Length of the solenoid after the absorber [mm]

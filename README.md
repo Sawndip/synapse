@@ -1,5 +1,7 @@
 ![synapse](https://francois-drielsma.github.io/synapse/logo.png)
 
+# SynAPSE
+
 # 1. About
 
 The Synergistic Analysis of Phase Space Evolution (**SynAPSE**)
@@ -18,7 +20,7 @@ transmission losses experienced in the magnetic channel
 motivated the development of non-standard phase space density 
 estimation techniques. The techniques rely on the concept of
 particle amplitude and 
-[nonparametric density etimation](https://en.wikipedia.org/wiki/Nonparametric_statistics).
+[nonparametric density estimation](https://en.wikipedia.org/wiki/Nonparametric_statistics).
 Support was added for G4Beamline ASCII output in order
 to broaden the scope of the package.
 
@@ -175,8 +177,6 @@ Any of the four trees may be left empty when filled and the
 emittance code will proceed accordingly. Specify which data type is
 requested in the datacards.
 
-###
-
 --------------------
 
 # 4. Main algorithms
@@ -255,7 +255,7 @@ is time intensive in four dimensions.
 
 --------------------
 
-# 5. Tools
+# 5. Beam
 
 --------------------
 
@@ -303,15 +303,16 @@ Density estimation package
 
 # 8. Latest version updates
 
-Version **0.5.3**
-  - Added a data extractor (Extractor)
-  - Added a drawing assistant (Drawer) to replace the old plot tools (removed)
-  - Optimized the amplitude algorithm (Amplitudes.cc)
-  - Optimized the profile algorithm (Profiles.cc)
-  - Does not compute the measurement uncertainties by default (Beam)
+Version **0.6.0**
+  - Optimized the main algorithms (Amplitudes.cc, PhaseSpace.cc, Profiles.cc, DenistyProfiles.cc)
+  - Created a new namespace (Beam) that encompasses every object that deal with beams
+  - Created the Stream object, an array of beam bunches at different z positions (Bunch)
+  - Created a drawing assistant (Drawer) to replace the old plotting tools (removed)
+  - Created a data extractor (Extractor)
+  - Does not compute the measurement uncertainties by default anymore (Bunch)
   - Fixed the spiral function, now fully supported (DSpiral)
   - Added verbosity option for the progress bar (ProgressBar)
-  - Bug fixes
+  - Many bug fixes
 
 Version **0.5.2**
   - Optimized reweighting algorithm (ReweightBeam.cc)
