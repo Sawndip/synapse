@@ -34,7 +34,7 @@ graphs for each of them.
 
 The package uniquely supports a wide array of non parametric
 density estimators that may be used to evaluate the probability
-density functions of the beams in 2D, 4D or 5D phase space. This
+density functions of the beams in the 2D or 4D transverse phase space. This
 allows for the unbiased evaluation of beam volumes, local densities and
 distributions of filamented beams in phase space.
 
@@ -179,7 +179,7 @@ requested in the datacards.
 
 --------------------
 
-# 4. Main algorithms
+# 4. Main scripts
 
 All the following algorithms support an identical data structure
 and are strictly ran on the imported data.
@@ -249,17 +249,222 @@ is time intensive in four dimensions.
 
 ## 4.3. Phase space profiles
 
+Profiles.cc is executed as follows
+
+    ./profiles [options] import.root
+
+It reconstructs the phase space profiles upstream and downstream of
+the absorber. If applied to a simulation, it reconstructs the distributions
+measured at the virtual planes specified by '**tku_vid**' and '**tkd_vid**'
+in the datacards.
+
+It creates a 1D histogram for each of the phase space variable and a 2D
+histogram for each possible combination of two of them and stores them to
+a ROOT file.
+
+It also produces comparison between the different data types of 1D histograms.
+If the data and simulation are both provided, it produces a ratio between
+simulaiton and data.
+
 ## 4.4. Density profiles
+
+DensityProfiles.cc is executed as follows
+
+    ./density [options] import.root
+
+It reconstructs the nonparametric density profile upstream and downstream of
+the absorber. If applied to a simulation, it reconstructs the profiles
+measured at the virtual planes specified by '**tku_vid**' and '**tkd_vid**'
+in the datacards.
+
+The density profile shows the probability contour level of the density
+estimator as a function of the fraction of the beam that the contour
+encompasses, i.e.
+
+![equation](https://latex.codecogs.com/gif.latex?%5Crho_%5Calpha%20%3D%20%5Crho%28F%5E%7B-1%7D%28%5Calpha%29%29%2C)
+
+with F the cumulative density function (CDF) and &alpha; the fraction of
+the beam included inside the contour. For a Gaussian beam, the profile
+follows a function of the form
+
+![equation](https://latex.codecogs.com/gif.latex?%5Crho_%5Calpha%20%3D%20%282%5Ed%5Cpi%5Ed%7C%5Cmathbf%7B%5CSigma%7D%7C%29%5E%5Cfrac12%20e%5E%7B-%5Cchi_d%5E2%28%5Calpha%29/2%7D%2C)
+
+which scales with the size of the RMS ellipse. If the beam density has
+increased, the profile is scaled up everywhere. If the beam has partially
+scraped, the core increase is preserved but the tail density is reduced.
+
+This is a good choice of variable because it is independant of the scale of
+the maximum density which is prone to statistical fluctuation.
+
+If the '**poincare**' flag is set to true, the algorithm creates poincaré
+sections of the density estimate upstream and downstream of the absorber.
 
 ## 4.5. Beam reweighting routine
 
+ReweightBeam.cc is executed as follows
+
+    ./density [options] import_data.root import_sim.root
+
+This algorithm computes the amplitude distributions of the source
+(import_sim.root) and the target (import_data.root) and reweights the 
+source to fit the target distribution. This allows to match simulations
+to the observed distributions.
+
+Two reweighting algorithm may be used:
+  - Most distant bin (0): Finds the bin that is most under the target, reweight
+    everything with respect to it;
+  - Bin by bin (1): Scale the bins to the target from the highest to the lowest.
+
+Both algorithms iterate until the Kolmogorov-Smirnov and Chi squared tests
+show that the source and target histograms agree.
+
 --------------------
 
-# 5. Beam
+# 5. Test scripts
+
+The test scripts are designed to test and demonstrate the performance of
+all the internal components of the SynAPSE framework. It is mostly focused
+on the nonparametric density esitmators developed for the package.
+
+## 5.1 Estimator quality
+
+TestEstimatorQuality.cc is executed as follows
+
+    ./test_quality [options]
+
+This algorithm qualitatively tests the performance of a nonparametric
+density estimator at reproducing the true underlying density profile of 
+a known distribution. The input parameters are specified in the 
+configuration defaults:
+  - '**de_algo**' specifies the class of density estiator to test.
+
+## 5.2 Estimator convergence
+
+TestEstimatorConvergence.cc is executed as follows
+
+    ./test_convergence [options]
+
+This algorithm quantitatively tests the performance of a nonparametric
+density estimator at converging towards the true underlying density
+profile of a known distribution in terms of Mean Integrated Squared Error
+(MISE). The input parameters are specified in the configuration defaults:
+  - '**de_algo**' specifies the class of density estiator to test.
+
+## 5.3 Estimator parameter optimization
+
+TestOptimalParameters.cc is executed as follows
+
+    ./test_optimal [options]
+
+This algorithm uses a golden search to minimize the Mean Integrated Squared
+Error (MISE) of a nonparametric density estimator. It optimizes the
+free parameters of the estimators, i.e.
+  - k in the k Nearest Neighbour (kNN) estimator;
+  - J in the Penalised Bootstrap Aggregate Tesselation Density Estimator (PBATDE).
+
+The input parameters are specified in the configuration defaults:
+  - '**de_algo**' specifies the class of density estiator to optimize.
+
+## 5.4 Convex hull volume convergence
+
+TestConvexHull.cc is executed as follows
+
+    ./test_hull [options]
+
+This algorithm tests the bias and uncertainty on the volume reconstructed
+from the convex hull of points sampled inside it. It may be used to test
+the rate of convergence of the method for points uniformly sampled inside
+a d-ball or inside an &alpha;-contour of a d-Gaussian distribution.
+
+## 5.5 Alpha-complex volume convergence
+
+TestAlphaComplex.cc is executed as follows
+
+    ./test_alphacomplex [options]
+
+This algorithm tests the bias and uncertainty on the volume reconstructed
+from the alpha complex of points sampled inside it. It may be used to test
+the rate of convergence of the method for points uniformly sampled inside
+a d-ball or inside an &alpha;-contour of a d-Gaussian distribution.
+
+## 5.6 Amplitude reconstruction
+
+TestAmplitudeRecon.cc is executed as follows
+
+    ./test_amplitude [options]
+
+The algorithm tests the different modes of amplitude reconstruction and their
+performance in non-linear scenarios. It also compares the different 
+amplitude reconstruction scheme with each other.
+
+A series of flags are available in the datcards:
+  - '**corrected**' computes the amplitudes by recursively removing high amplitudes;
+  - '**mcd**' computes the amplitudes based on the MCD covariance matrix;
+  - '**generalised**' uses non parametric density estimation to produce amplitudes.
+
 
 --------------------
 
 # 6. Toy Monte Carlo
+
+The toy Monte Carlo code allows for the fast production and transport of ideal beams.
+ToySimulation.cc is executed as follows
+
+    ./toy_sim [options]
+
+## 6.1 Generation
+
+The generator produces a Gaussian beam based on the cards specified in the 
+ConfigurationsDefaults.txt or in the command line arguments:
+  - '**toy_mass**' specifies the mass of the beam particles in MeV/c^2;
+  - '**toy_n**' specifies the amount of particles to be generated;
+  - '**toy_seed**' sets the seem of the random number generator;
+  - '**toy_eps**' sets the normalised emittance of the beam in mm;
+  - '**toy_mom**' sets the longitudinal momentum of the particles in the beam in MeV/c;
+  - '**toy_alpha**' sets the beam &alpha; function at production;
+  - '**toy_beta**' sets the beam &beta; function at production in mm.
+
+The beam is generated just upstream of the toy absorber.
+
+## 6.1 Abosrber
+
+The absorber characteristics are specified in the data cards. The energy loss is
+computed in a purely deterministic fashion by integrating the Bethe-Bloch formula
+over the full length of the absorber (EnergyLoss):
+
+![equation](https://latex.codecogs.com/gif.latex?K%5Crho%5Cfrac%7BZ%7D%7BA%7D%5Cfrac1%7B%5Cbeta%5E2%7D%5Cleft%28%5Cln%5Cleft%28%5Cfrac%7B2m_ec%5E2%5Cbeta%5E2%5Cgamma%5E2%7D%7BI%7D%5Cright%29-%5Cbeta%5E2%20%5Cright%20%29.)
+
+The scattering is a stochastic process which is approximatively described
+by a Gaussian distribution of RMS angle:
+
+![equation](https://latex.codecogs.com/gif.latex?%5Ctheta_0%20%3D%20%5Cfrac%7B13.6%5Ctext%7BMeV%7D%7D%7Bp%5Cbeta%20c%7D%5Csqrt%7B%5Cfrac%7BL%7D%7BX_0%7D%7D%5Cleft%5B1&plus;0.038%5Cln%5Cleft%28L/X_0%20%5Cright%20%29%20%5Cright%20%5D%2C)
+
+with X0 the radiation length and L and the length of the absorber.
+
+The physics processes are controlled through:
+  - '**toy_scat**' turns the scattering on or off (0/1);
+  - '**toy_eloss**' turns the energy loss on or off (0/1).
+
+## 6.2. Transport
+
+Beam line elements may be added to the toy simulation right downstream of the
+toy absorber. One may add:
+ - '**toy_drift**' adds a drift space of required length in mm;
+ - '**toy_sol**' adds a solenoid of required length in mm.
+
+The beam line elements are reprensted by unitary transfer matrices that rotate 
+the phase space vectors of the beam particles in a linear fashion through
+
+![equation](https://latex.codecogs.com/gif.latex?%5Cmathbf%7Bx%7D%27%20%3D%20%5Cmathbf%7BM%7D%5Cmathbf%7Bx%7D%2C) 
+
+which in turn transforms the covariance matrix throuh
+
+![equation](https://latex.codecogs.com/gif.latex?%5Cmathbf%7B%5CSigma%7D%27%20%3D%20%5Cmathbf%7BM%7D%5Cmathbf%7B%5CSigma%7D%5Cmathbf%7BM%7D%5ET.)
+
+## 6.3 Output
+The toy simulation algorithm outputs the beam at the initial reference plane (0)
+and after all the beam line elements (1). The output file may be used in the main
+scripts by specifying the **tku_vid** and **tkd_vid**.
 
 --------------------
 

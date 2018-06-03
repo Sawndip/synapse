@@ -504,8 +504,8 @@ std::string Drawer::FindBestCorner(std::map<std::string, TGraphErrors*> graphs) 
 
   // Loop over the corners, find one that does not have any points drawn. If it cannot be
   // found, abort and do not draw the stat and info boxes.
-  std::vector<double> xllim = {.72, .12, .12, .72};
-  std::vector<double> xulim = {.88, .28, .28, .88};
+  std::vector<double> xllim = {.525, .12, .12, .525};
+  std::vector<double> xulim = {.88, .475, .475, .88};
   std::vector<double> yllim = {.72, .72, .12, .12};
   std::vector<double> yulim = {.88, .88, .72, .72};
   std::vector<std::string> corners = {"tr", "tl", "bl", "br"};

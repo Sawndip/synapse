@@ -23,7 +23,7 @@
 int main(int argc, char ** argv) {
 
   // Reroot the info messages to the terminal for now (TODO)
-  Pitch::setAnOutput(Pitch::debug, std::cerr);
+  Pitch::setAnOutput(Pitch::info, std::cerr);
 
   // Emittance algorithm global parameters (stored in globals)
   Globals &globals = Globals::GetInstance(argc, argv);
@@ -48,11 +48,11 @@ int main(int argc, char ** argv) {
   // If the corrected amplitudes are requested, set them
   // Set the core fraction of the streams, reconstruct the core volume
   for (const std::string& type : types) {
-    streams[type].SetCoreFraction(globals["frac"]);    
     if ( globals["corrected"] )
       for (const size_t& i : streams[type].GetPlaneIds())
           streams[type][i].SetCorrectedAmplitudes();
 
+    streams[type].SetCoreFraction(globals["frac"]);    
     if ( !globals["de"] ) {
       for (const size_t& i : streams[type].GetPlaneIds())
           streams[type][i].SetCoreVolume();

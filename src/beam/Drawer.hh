@@ -39,7 +39,7 @@ struct DrawOpt {
   int line_width = 2;		///< Line width
   int fill_style = 0;		///< Fill pattern (TAttFill code)
   int fill_color = 0;		///< Fill color (TColor code)
-  int fill_alpha = 1;		///< Fill opacity (From 0=transparent to 1=opaque)
+  double fill_alpha = 1;	///< Fill opacity (From 0=transparent to 1=opaque)
   int marker_style = 0;		///< Marker shape (TAttMarker code)
   int marker_color = 1;		///< Marker color (TColor code)
   int marker_size  = 1;		///< Marker size
