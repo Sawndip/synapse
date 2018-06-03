@@ -93,7 +93,7 @@ if [ ! -d third_party/qhull ]; then
   tar -xvf qhull*tgz
   mv qhull-2015.2 qhull
   pushd qhull
-  make -j ${NUM_THREADS}
+  make
   popd
 
   echo
