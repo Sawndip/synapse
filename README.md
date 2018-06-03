@@ -426,7 +426,7 @@ ConfigurationsDefaults.txt or in the command line arguments:
 
 The beam is generated just upstream of the toy absorber.
 
-## 6.1 Abosrber
+## 6.1 Absorber
 
 The absorber characteristics are specified in the data cards. The energy loss is
 computed in a purely deterministic fashion by integrating the Bethe-Bloch formula
