@@ -133,9 +133,9 @@ double FieldHandler::K(const double& m) const {
   TF1 func("func", "1./sqrt(1.-[0]*sin(x)*sin(x))", 0, M_PI/2);
   func.SetParameter(0, m);
   
-  // Return its integral between 0 and pi/2
-  return func.Integral(0, M_PI/2, func.GetParameters(), 1e-3);
-//  return func.Integral(0, M_PI/2, 1e-3);
+  // Return its integral between 0 and pi/2. Lack of backward compatibility
+  // for in ROOT 5 in ROOT 6 prevents using user defined accurary (TODO)
+  return func.Integral(0, M_PI/2);
 }
 
 double FieldHandler::E(const double& m) const {
@@ -144,9 +144,9 @@ double FieldHandler::E(const double& m) const {
   TF1 func("func", "sqrt(1.-[0]*sin(x)*sin(x))", 0, M_PI/2);
   func.SetParameter(0, m);
   
-  // Return its integral between 0 and pi/2
-  return func.Integral(0, M_PI/2, func.GetParameters(), 1e-3);
-//  return func.Integral(0, M_PI/2, 1e-3);
+  // Return its integral between 0 and pi/2. Lack of backward compatibility
+  // for in ROOT 5 in ROOT 6 prevents using user defined accurary (TODO)
+  return func.Integral(0, M_PI/2);
 }
 
 double FieldHandler::Pi(const double& n, const double& m) const {
@@ -155,7 +155,7 @@ double FieldHandler::Pi(const double& n, const double& m) const {
   TF1 func("func", "1./((1-[0]*sin(x)*sin(x))*sqrt(1.-[1]*sin(x)*sin(x)))", 0, M_PI/2);
   func.SetParameter(n, m);
   
-  // Return its integral between 0 and pi/2
-  return func.Integral(0, M_PI/2, func.GetParameters(), 1e-3);
-//  return func.Integral(0, M_PI/2, 1e-3);
+  // Return its integral between 0 and pi/2. Lack of backward compatibility
+  // for in ROOT 5 in ROOT 6 prevents using user defined accurary (TODO)
+  return func.Integral(0, M_PI/2);
 }

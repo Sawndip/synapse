@@ -5,7 +5,6 @@ FILE_STD=install.log
 if [ -z "$MAUS_ROOT_DIR" ]; then
    echo "WARNING: \$MAUS_ROOT_DIR is not set"
    echo "WARNING: the MAUS data structure importer will not be built"
-   exit 1;
 fi
 
 if [ -f $FILE_STD ];
