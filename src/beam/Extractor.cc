@@ -101,7 +101,7 @@ std::map<std::string, Stream>
         Pitch::print(Pitch::debug, "Extracting the "+DataTypeName[type], "Extractor::GetStreams");
         TNtuple* tree = (TNtuple*)data_file.Get(DataTypeName[type].c_str());
         float* ntuple;
-        size_t i, plane_id, particle_id, buff_id(0), n((size_t)tree->GetEntries());
+        size_t i, plane_id, particle_id, buff_id(-1), n((size_t)tree->GetEntries());
         double pos_buff(-DBL_MAX);
         bool mctruth = type.find("truth") != std::string::npos;
         size_t off = mctruth ? 0 : 1;
@@ -116,6 +116,7 @@ std::map<std::string, Stream>
 	  tree->GetEntry(i);
 	  ntuple = tree->GetArgs();
 	  plane_id = mctruth ? ntuple[2] : ntuple[2]*5+ntuple[3];
+
 	  if ( ids[type].size() )
 	    if ( !std::binary_search(ids[type].begin(), ids[type].end(), plane_id) )
 	        continue;

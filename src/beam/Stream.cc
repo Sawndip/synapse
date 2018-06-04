@@ -189,6 +189,9 @@ std::map<SumStat, TGraphErrors*> Stream::FractionalGraphs(const size_t idu,
 
       // Set the current core fraction, compute the volumes
       size = frac*_bunches.at(idu).Size();
+      _bunches.at(idu).SetFraction(frac);
+      _bunches.at(idd).SetFraction(frac);
+
       _bunches.at(idu).SetCoreSize(size);
       _bunches.at(idd).SetCoreSize(size);
 

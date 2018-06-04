@@ -426,7 +426,7 @@ ConfigurationsDefaults.txt or in the command line arguments:
 
 The beam is generated just upstream of the toy absorber.
 
-## 6.1 Absorber
+## 6.2 Absorber
 
 The absorber characteristics are specified in the data cards. The energy loss is
 computed in a purely deterministic fashion by integrating the Bethe-Bloch formula
@@ -445,7 +445,7 @@ The physics processes are controlled through:
   - '**toy_scat**' turns the scattering on or off (0/1);
   - '**toy_eloss**' turns the energy loss on or off (0/1).
 
-## 6.2. Transport
+## 6.3. Transport
 
 Beam line elements may be added to the toy simulation right downstream of the
 toy absorber. One may add:
@@ -461,7 +461,7 @@ which in turn transforms the covariance matrix throuh
 
 ![equation](https://latex.codecogs.com/gif.latex?%5Cmathbf%7B%5CSigma%7D%27%20%3D%20%5Cmathbf%7BM%7D%5Cmathbf%7B%5CSigma%7D%5Cmathbf%7BM%7D%5ET.)
 
-## 6.3 Output
+## 6.4 Output
 The toy simulation algorithm outputs the beam at the initial reference plane (0)
 and after all the beam line elements (1). The output file may be used in the main
 scripts by specifying the **tku_vid** and **tkd_vid**.

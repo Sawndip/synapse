@@ -53,7 +53,7 @@ int main(int argc, char ** argv) {
   gSystem->Load("libTree");
 
   // Output files
-  std::string out_dir = "beams/"+globals["run_number"];
+  std::string out_dir = "beams/"+(std::string)globals["run_number"];
   std::string sysCmd = "mkdir -p "+out_dir;
   if ( std::system(sysCmd.c_str()) ) {
     Pitch::print(Pitch::error, "Couldn't create a directory for the beam files");
@@ -111,7 +111,7 @@ int main(int argc, char ** argv) {
 	  vpoint["y"] = ntuple[5];
 	  vpoint["px"] = ntuple[7];
 	  vpoint["py"] = ntuple[8];
-	  vpoint["pz"] = ntuple[9];
+	  vpoint["pz"] = ntuple[9] += .5; // Compensate for eloss in the station
 
 	  // Fill the true samples
 	  *out[det][st] << "[" << vpoint["x"];

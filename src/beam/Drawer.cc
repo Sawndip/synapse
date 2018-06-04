@@ -82,7 +82,7 @@ ScatterGraph* Drawer::NewAmplitudeScatter(const std::string& name,
 		       	      	      	  const std::string& vary) const {
 
   VarSet setx = _varsets.at(varx);
-  VarSet sety = _varsets.at(varx);
+  VarSet sety = _varsets.at(vary);
   std::string x_title = setx.label+" ["+setx.unit+"]";
   std::string y_title = sety.label+" ["+sety.unit+"]";
 

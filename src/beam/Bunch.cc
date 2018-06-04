@@ -531,7 +531,7 @@ TEllipse* Bunch::Ellipse(const std::string& vara,
 
     std::vector<double> mean = {Math::Mean(_data[vara]), Math::Mean(_data[varb])};
     Matrix<double> covmat( { {_data.S(vara, vara), _data.S(vara, varb)},
-			     {_data.S(varb, varb), _data.S(varb, varb)} } );
+			     {_data.S(varb, vara), _data.S(varb, varb)} } );
 
     DGaus gaus(mean, covmat);
     ell = (TEllipse*)gaus.Contour2D(p)[0];
