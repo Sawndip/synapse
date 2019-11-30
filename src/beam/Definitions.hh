@@ -40,8 +40,9 @@ enum 	PhaseSpaceVariable {x, px, y, py, pz};
  *	    - mode: amplitude mode
  *	    - mom: mean momentum
  *	    - trans: transmission
+ *	    - disp: dispersion
  */
-enum SumStat {alpha, beta, gamma, mecl, eps, neps, amp, subeps, vol, mom, trans};
+enum SumStat {alpha, beta, gamma, mecl, eps, neps, amp, subeps, vol, den, mom, trans, disp};
 
 /** @brief Structure that stores the characteristics of each summary statistic */
 struct SumStatStruct {

@@ -245,6 +245,7 @@ void DecrementCovariance(const size_t& n,
     cov = 0.;
   } else {
     cov = (n-1)*cov/(n-2)-n*(x-xmean)*(y-ymean)/(n-1)/(n-2);
+//    cov = (n-1)*cov/(n-2)-(x-xmean)*(y-ymean)/(n-2);
   }
 }
 
@@ -273,12 +274,13 @@ Matrix<double> CovarianceMatrix(const Matrix<double>& mat) {
   size_t i, j;
   for (i = 0; i < mat.Nrows(); i++)
     for (j = 0; j < mat.Nrows(); j++)
-      S[i][j] = (j < i) ? S[j][i] : Covariance(mat[i], mat[j]);
+        S[i][j] = (j < i) ? S[j][i] : Covariance(mat[i], mat[j]);
       
   return S;
 }
 
 Matrix<double> RobustCovarianceMatrix(const Matrix<double>& mat,
+				      std::vector<double>& mean,
 				      const double hh) {
 
   // If the matrix is empty or has a single element per sample, throw
@@ -288,18 +290,26 @@ Matrix<double> RobustCovarianceMatrix(const Matrix<double>& mat,
   Matrix<double> sample(mat);
 
   // Feed the data to the ROOT implementation of MCD
-  TRobustEstimator robust(sample.Ncols(), sample.Nrows(), hh*sample.Ncols());
+  size_t dim = sample.Nrows();
+  TRobustEstimator robust(sample.Ncols(), dim, hh*sample.Ncols());
   size_t i, j;
-  for (i = 0; i < sample.Nrows(); i++)
+  for (i = 0; i < dim; i++)
       robust.AddColumn(&sample[i][0]);
   robust.Evaluate();
 
   // Extract the covariance matrix
   TMatrixDSym covmat = *robust.GetCovariance();
-  Matrix<double> S(sample.Nrows(), sample.Nrows());
-  for (i = 0; i < sample.Nrows(); i++)
-    for (j = 0; j < sample.Nrows(); j++)
-      S[i][j] = (j < i) ? S[j][i] : covmat[i][j];
+  Matrix<double> S(dim, dim);
+  for (i = 0; i < dim; i++)
+    for (j = 0; j < dim; j++)
+        S[i][j] = (j < i) ? S[j][i] : covmat[i][j];
+
+  // Extract the mean
+  TVectorD mu;
+  robust.GetMean(mu);
+  mean.resize(dim);
+  for (i = 0; i < dim; i++)
+      mean[i] = mu[i];
 
   return S;
 }

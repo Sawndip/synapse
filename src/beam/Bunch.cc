@@ -4,7 +4,7 @@ namespace Beam {
 
 Bunch::Bunch() :
   _name(""), _dim(0), _pos(0.), _mass(0.), _fraction(0.), _data(), _core(), _alpha(), _beta(),
-  _gamma(), _mecl(), _eps(), _neps(), _seps(), _feps(), _qamp(), _amps(), _vols(), _de() {
+  _gamma(), _mecl(), _eps(), _neps(), _seps(), _feps(), _qamp(), _qlev(), _amps(), _vols(), _de() {
 }
 
 Bunch::Bunch(const BunchMap& samples,
@@ -12,7 +12,7 @@ Bunch::Bunch(const BunchMap& samples,
 	     const std::string& name,
 	     const double mass) :
   _name(name), _dim(0), _pos(pos), _mass(mass), _fraction(0.), _data(), _core(), _alpha(), _beta(),
-  _gamma(), _mecl(), _eps(), _neps(), _seps(), _feps(), _qamp(), _amps(), _vols(), _de() {
+  _gamma(), _mecl(), _eps(), _neps(), _seps(), _feps(), _qamp(), _qlev(), _amps(), _vols(), _de() {
 
 
   BunchMap errors;
@@ -31,7 +31,7 @@ Bunch::Bunch(const BunchMap& samples,
 	     const std::string& name,
 	     const double mass) :
   _name(name), _dim(0), _pos(pos), _mass(mass), _fraction(0.), _data(), _core(), _alpha(), _beta(),
-  _gamma(), _mecl(), _eps(), _neps(), _seps(), _feps(), _qamp(), _amps(), _vols(), _de() {
+  _gamma(), _mecl(), _eps(), _neps(), _seps(), _feps(), _qamp(), _qlev(), _amps(), _vols(), _de() {
 
   try {
     Initialize(samples, errors);
@@ -66,6 +66,7 @@ Bunch& Bunch::operator=(const Bunch& bunch) {
   _seps = bunch._seps;
   _feps = bunch._feps;
   _qamp = bunch._qamp;
+  _qlev = bunch._qlev;
   _amps = bunch._amps;
   _vols = bunch._vols;
   _de = bunch._de;
@@ -80,9 +81,19 @@ const std::vector<double>& Bunch::Samples(const std::string var) const {
   return _data[var];
 }
 
+const std::vector<double>& Bunch::CoreSamples(const std::string var) const {
+
+  return _core[var];
+}
+
 const std::vector<double>& Bunch::Errors(const std::string var) const {
 
   return _data.Errors(var);
+}
+
+const std::vector<double>& Bunch::CoreErrors(const std::string var) const {
+
+  return _core.Errors(var);
 }
 
 double Bunch::Radius(const size_t i) const {
@@ -106,8 +117,7 @@ Variable Bunch::Mean(const std::string& var) const {
     std::vector<double> samples, errors;
     Arrays(var, samples, errors);
 
-//    mean.SetValue(Math::TMean(samples, .05));
-//    mean.SetSError(Math::TMeanSError(samples, .05));
+//    mean.SetValue(Math::Mode(samples));
     mean.SetValue(Math::Mean(samples));
     mean.SetSError(Math::MeanSError(samples));
     if ( errors.size() )
@@ -178,6 +188,14 @@ Variable Bunch::Gamma(const std::string axis) const {
   return gamma;
 }
 
+Variable Bunch::Dispersion() const {
+
+  std::vector<double> devs = Deviations();
+  double covx = Math::Covariance(devs, Samples("x"));
+  double covy = Math::Covariance(devs, Samples("y"));
+  return (covx+covy)/2.;
+}
+
 Variable Bunch::NormEmittanceEstimate(const SumStat& stat) const {
 
   try {
@@ -204,6 +222,10 @@ Variable Bunch::NormEmittanceEstimate(const SumStat& stat) const {
     } else if ( stat == vol ) {
       neps.SetValue(pow(std::tgamma((double)_dim/2+1)*_feps.GetValue(), 2./_dim)/_mass/M_PI/(R*R));
       neps.SetSError(neps.GetValue()*(2./_dim)*_seps.GetSError()/_seps.GetValue());
+
+    } else if ( stat == den ) {
+      neps.SetValue(pow(_qlev.GetValue(), -2./_dim)*exp(-R*R/_dim)/2./M_PI/_mass);
+      neps.SetSError(neps.GetValue()*(2./_dim)*_seps.GetSError()/_seps.GetValue());
     }
 
     return neps;
@@ -221,52 +243,47 @@ Variable Bunch::SummaryStatistic(const SumStat& stat) const {
     switch(stat) {
       case alpha:
         return Alpha();
-        break;
       case beta:
         return Beta();
-        break;
       case gamma:
         return Gamma();
-        break;
       case mecl:
         return MechanicalL();
-        break;
       case eps:
         return Emittance();
-        break;
       case neps:
         return NormEmittance();
-        break;
       case amp:
 	return AmplitudeQuantile();
-	break;
       case subeps:
 	return SubEmittance();
-	break;
       case vol:
 	return FracEmittance();
-	break;
+      case den:
+	return DensityQuantile();
       case mom:
         return Mean("ptot");
-        break;
       case trans:
         return Variable(1.);
-        break;
+      case disp:
+        return Dispersion();
     }
 
     return Variable(0.);
   } catch ( Exceptions::Exception& e ) {
     throw(Exceptions::Exception(Exceptions::recoverable,
-	  "Could not produce the requested summary statistic"+std::string(e.what()),
+	  "Could not produce the requested summary statistic: "
+	  +SumStatDict[stat].name+std::string(e.what()),
 	  "Bunch::SummaryStatistic"));
   }
 }
 
-void Bunch::SetCoreFraction(const double frac) {
+void Bunch::SetCoreFraction(const double frac,
+			    const std::string fom) {
 
   try {
     _fraction = frac;
-    SetCoreSize(frac*Size());
+    SetCoreSize(frac*Size(), fom);
   } catch ( Exceptions::Exception& e ) {
     throw(Exceptions::Exception(Exceptions::recoverable,
 	  "Failed to set with fraction "+std::to_string(frac)+std::string(e.what()),
@@ -274,7 +291,8 @@ void Bunch::SetCoreFraction(const double frac) {
   } 
 }
 
-void Bunch::SetCoreSize(const size_t size) {
+void Bunch::SetCoreSize(const size_t size,
+			const std::string fom) {
 
   // Check that the number of samples requested is possible
   size_t N = Size();
@@ -284,13 +302,26 @@ void Bunch::SetCoreSize(const size_t size) {
   std::vector<std::pair<size_t, double>> foms(N);	// Array of figures-of-merit
   size_t i, j;
 
-  // Store all the single particle amplitudes
-  for (i = 0; i < N; i++) {
-    foms[i].first = i;
-    foms[i].second = _amps[i];
+  // Store all the figure-of-merits along with their ordering
+  for (i = 0; i < N; i++)
+      foms[i].first = i;
+
+  if ( fom == "amp" ) {
+    for (i = 0; i < N; i++)
+        foms[i].second = _amps[i];
+  } else if ( fom == "de" ) {
+    for (i = 0; i < N; i++)
+        foms[i].second = -_de.DensityLevels()[i]; // Negative to sort from largest to smallest de
+  } else if ( fom == "vvol" ) {
+    for (i = 0; i < N; i++)
+        foms[i].second = _vols[i];
+  } else {
+    throw(Exceptions::Exception(Exceptions::nonRecoverable,
+	  "Figure of merit not recognized: "+fom,
+	  "Bunch::SetCoreSize"));
   }
 
-  // Sort the figures-of-merit
+  // Sort the figures-of-merit in ascending order
   std::sort(foms.begin(), foms.end(),
 	    [] (const std::pair<size_t, double>& a, const std::pair<size_t, double>& b) {
 		  return a.second < b.second;
@@ -311,11 +342,18 @@ void Bunch::SetCoreSize(const size_t size) {
   // Set the core object
   _core = BunchData(subsamples, suberrors);
 
-  // Set the alpha-amplitude
-  SetAmplitudeQuantile(foms[size-1].second);
+  // If the amplitude is used as a figure of merit, set the quantile and subemittance
+  // If the density levels are used, set the density quantile
+  if ( fom == "amp" ) {
+    // Set the alpha-amplitude
+    SetAmplitudeQuantile(foms[size-1].second);
 
-  // Set the alpha-subemittance
-  SetSubEmittance();
+    // Set the alpha-subemittance
+    SetSubEmittance();
+  } else if ( fom == "de" ) {
+    // Set the alpha-quantile
+    SetDensityQuantile(-foms[size-1].second); // Back to positive
+  }
 }
 
 void Bunch::SetCoreVolume(const std::string algo,
@@ -335,10 +373,12 @@ void Bunch::SetCoreVolume(const std::string algo,
       orgQhull::Qhull qhull("", _dim, CoreSize(), &(points[0]), "");
 
       // Correct the measured for volume for the natural bias of a convex hull
-      _feps.SetValue(qhull.volume()/Math::HullVolumeTGausRelativeBias(_dim, _fraction, Size()));
+      _feps.SetValue(qhull.volume()/
+	Math::HullVolumeTGausRelativeBias(_dim, _fraction, CoreSize()/_fraction));
 
       // Record the statistical uncertainty on the convex hull
-      _feps.SetSError(_feps.GetValue()*Math::HullVolumeTGausRelativeRMS(_dim, _fraction, Size()));
+      _feps.SetSError(_feps.GetValue()*
+	Math::HullVolumeTGausRelativeRMS(_dim, _fraction, CoreSize()/_fraction));
 
     } else if ( algo == "alpha" ) {
       // Create an alpha complex of the core points and return its volume
@@ -351,13 +391,8 @@ void Bunch::SetCoreVolume(const std::string algo,
 
     } else if ( algo == "de" ) {
 
-      // Feed the samples to the density estimator
-      if ( !_de.GetDimension() ) {
-        Matrix<double> points = _data.PhaseSpace().Transpose();
-        _de = DensityEstimator(points.std(), algo, false, norm);
-      }
-
       // Compute the volume of the contour
+      SetDensityLevels(norm);
       _feps.SetValue(_de.ContourVolume(_fraction, "mc", false));
       _feps.SetSError(_de.ContourVolumeError());
 
@@ -384,32 +419,32 @@ void Bunch::SetCorrectedAmplitudes() {
   std::vector<double> means(_dim);
   double neps = NormEmittanceValue(_data.S());
   size_t i, j;
-  for (i = 0; i < _dim; i++)
-      means[i] = Math::Mean(_data.PhaseSpace()[i]);
+  for (j = 0; j < _dim; j++)
+      means[j] = Math::Mean(_data.PhaseSpace()[j]);
 
-  // For each particle, compute the product neps*vec^T*invcovmat*vec
-  // Sort the amplitudes in a descending order and retain the particle id they are associated with
+  // Sort the amplitudes in a ascending order and retain the particle id they are associated with
   std::vector<std::pair<size_t, double>> amps(N);
   for (i = 0; i < N; i++)
-      amps[i] = std::pair<size_t, double>(i, AmplitudeValue(invcovmat, means, samples[i], neps));
+      amps[i] = std::pair<size_t, double>(i, _amps[i]);
 
   std::sort(amps.begin(), amps.end(), [] (const std::pair<size_t, double>& a,
 	const std::pair<size_t, double>& b) { return a.second < b.second; });
 
   // Start with the highest amplitude, remove one particle at each step
   // Fast to upload means and cov. matrix, slow to recompute amplitudes... (TODO?)
-  _amps.resize(N);
+  size_t id;
   while ( amps.size() > _dim ) {
 
-    // Add the current highest amplitude
-    _amps[amps.back().first] = amps.back().second;
+    // Save the current highest amplitude
+    id = amps.back().first;
+    _amps[id] = amps.back().second;
 
     // Update the inverse covariance matrix, the emittance and the means
-    Math::DecrementCovarianceMatrix(amps.size(), covmat, means, samples[amps.back().first]);
+    Math::DecrementCovarianceMatrix(amps.size(), covmat, means, samples[id]);
     invcovmat = covmat.Inverse();
     neps = NormEmittanceValue(covmat);
     for (j = 0; j < _dim; j++)
-	Math::DecrementMean(amps.size(), means[j], samples[amps.back().first][j]);
+	Math::DecrementMean(amps.size(), means[j], samples[id][j]);
 
     // Remove the amplitude from the list, recompute the last n amplitudes in the sample
     amps.pop_back();
@@ -433,79 +468,27 @@ void Bunch::SetCorrectedAmplitudes() {
 void Bunch::SetMCDAmplitudes() {
 
   // Compute the inverse covariance matrix and the means in each projection
-  Matrix<double> covmat = Math::RobustCovarianceMatrix(_data.PhaseSpace());
+  std::vector<double> means;
+  Matrix<double> covmat = Math::RobustCovarianceMatrix(_data.PhaseSpace(), means);
   Matrix<double> invcovmat = covmat.Inverse();
-  std::vector<double> means(_dim);
-  size_t i;
-  for (i = 0; i < _dim; i++)
-      means[i] = Math::RobustMean(_data.PhaseSpace()[i]);
 
   // For each particle, compute the product eps*vec^T*invcovmat*vec
   _amps.resize(Size());
-  for (i = 0; i < _amps.size(); i++)
+  for (size_t i = 0; i < _amps.size(); i++)
       _amps[i] = AmplitudeValue(invcovmat, means, _data.PhaseSpace().Column(i), _neps.GetValue());
-}
-
-void Bunch::SetGeneralisedAmplitudes(const double norm) {
-
-  // Feed the samples to the density estimator
-  if ( !_de.GetDimension() ) {
-    Matrix<double> points = _data.PhaseSpace().Transpose();
-    _de = DensityEstimator(points.std(), "knn");
-
-    gStyle->SetOptStat(0);
-    InfoBox info("Preliminary", "2.9.1", "1.2_10mm", "2016/04");
-    TCanvas *c = new TCanvas("c", "c", 1200, 800);
-    TH2F* graph = _de.Graph2D(-100, 100, -80, 80, _data.Id("x"), _data.Id("px"), {0, 0, 0, 0}); 
-
-    // Find the contour level (compute the DE in all the points
-    /*Matrix<double> samples = _data.PhaseSpace().Transpose();
-    std::vector<double> densities(samples.Nrows());
-    for (size_t i = 0; i < samples.Nrows(); i++) {
-	densities[i] = _de(samples[i]);
-    }
-    std::sort(densities.begin(), densities.end());
-    double level = densities[.91*densities.size()];
-    std::cerr << level << std::endl;
-    graph->SetMinimum(level);*/
-    
-
-    graph->Draw("CONTZ");
-    graph->SetTitle(";x [mm];p_{x}  [MeV/c];#rho [mm^{-2}(MeV/c)^{-2}]");
-    info.SetPosition("tl");
-    info.Draw();
-    c->SetRightMargin(0.15);
-    c->SaveAs("de_knn.pdf");
-    delete c;
-  }
-
-  // For each particle, compute the density
-  _amps.resize(Size());
-  size_t i;
-  for (i = 0; i < _amps.size(); i++)
-      _amps[i] = _de(_data.PhaseSpace().Column(i));
-
-  // Compute the contour volume
-/* double frac = tgamma((double)_dim/2.)*TMath::Gamma((double)_dim/2., .5);
-  double volume = _de.ContourVolume(frac*norm, "mc", false);
-
-  // Find the maximum of the probability distribution
-  double max = *std::max_element(_amps.begin(), _amps.end());
-//  double max = 1./(pow(2, (double)_dim/2)*tgamma((double)_dim/2+1)*volume);
-
-  // Compute the estimated emittance (prefactor)
-  double neps = NormEmittanceEstimate(frac, volume);*/
-
-  // For each particle, compute the generalised distance
-  for (i = 0; i < _amps.size(); i++)
-//      _amps[i] = neps*Math::GeneralisedDistanceSquared(_amps[i], max);
-      _amps[i] = -log(_amps[i]);
 }
 
 void Bunch::SetVoronoiVolumes() {
   
   try {
+    // If the volumes are already filled, return
+    if ( _vols.size() == Size() )
+	return;
+
+    // Tesselate the space
     Voronoi vor((_data.PhaseSpace()).std(), false);
+
+    // Extract the cell volumes
     for (const Hull& cell : vor.GetCellArray()) {
       if ( cell.GetVolume() >= 0 ) {
         _vols.push_back(cell.GetVolume());
@@ -517,6 +500,30 @@ void Bunch::SetVoronoiVolumes() {
     throw(Exceptions::Exception(Exceptions::nonRecoverable,
 	  "Could not set"+std::string(e.what()),
 	  "Bunch::SetVoronoiVolumes"));
+  }
+}
+
+void Bunch::SetDensityLevels(const double norm) {
+  
+  try {
+    // If the density estimator has not been initialized, do it
+    if ( !_de.GetDimension() ) {
+      Matrix<double> points = _data.PhaseSpace().Transpose();
+      _de = DensityEstimator(points.std(), "knn", false, norm);
+      _de.SetName(_name);
+    }
+
+    // If the levels are already set, return
+    if ( _de.DensityLevels().size() == Size() )
+	return;
+
+    // Find the density levels of the particles
+    _de.SetDensityLevels();
+
+  } catch ( Exceptions::Exception& e ) {
+    throw(Exceptions::Exception(Exceptions::nonRecoverable,
+	  "Could not set"+std::string(e.what()),
+	  "Bunch::SetDensityLevels"));
   }
 }
 
@@ -553,12 +560,17 @@ TEllipse* Bunch::RobustEllipse(const std::string& vara,
     AssertContains(vara);
     AssertContains(varb);
 
-    std::vector<double> mean = {Math::RobustMean(_data[vara]),
-				Math::RobustMean(_data[varb])};
-    Matrix<double> samples({_data[vara], _data[varb]});
-    Matrix<double> covmat = Math::RobustCovarianceMatrix(samples);
+    std::vector<double> mu;
+    Matrix<double> covmat = Math::RobustCovarianceMatrix(_data.PhaseSpace(), mu);
 
-    DGaus gaus(mean, covmat);
+    std::vector<double> mean = {mu[_data.Id(vara)], mu[_data.Id(varb)]};
+    std::vector<std::string> vars = {vara, varb};
+    Matrix<double> submat(2, 2);
+    for (size_t i = 0; i < 2; i++)
+      for (size_t j = 0; j < 2; j++)
+	  submat[i][j] = covmat[_data.Id(vars[i])][_data.Id(vars[j])];
+
+    DGaus gaus(mean, submat);
     ell = (TEllipse*)gaus.Contour2D(p)[0];
     return ell;
   } catch ( Exceptions::Exception& e ) {
@@ -620,6 +632,40 @@ TH2F* Bunch::Histogram(const std::string& vara,
   }
 }
 
+TH2F* Bunch::DensityGraph(const std::string& vara, 
+		          const std::string& varb,
+		          double mina,
+		          double maxa,
+		          double minb,
+		          double maxb,
+			  std::vector<double> x) const {
+
+  TH2F *hist = NULL;
+  try {
+    // If the density estimator has not been initialized, throw
+    if ( !_de.GetDimension() )
+    	throw(Exceptions::Exception(Exceptions::nonRecoverable,
+	      "Density estimator is not yet initialized",
+	      "Bunch::DensityGraph"));
+
+    AssertContains(vara);
+    AssertContains(varb);
+
+    Drawer drawer;
+    if ( maxa == mina )
+        drawer.GetVariableLimits(vara, mina, maxa);
+    if ( maxb == minb )
+        drawer.GetVariableLimits(varb, minb, maxb);
+    hist = _de.Graph2D(mina, maxa, minb, maxb, _data.Id(vara), _data.Id(varb), x);
+    return hist;
+  } catch ( Exceptions::Exception& e ) {
+    throw(Exceptions::Exception(Exceptions::recoverable,
+	  "Could not produce a 2D section of the density estimator"+std::string(e.what()),
+	  "Bunch::DensityGraph"));
+    return hist;
+  }
+}
+
 ScatterGraph* Bunch::AmplitudeScatter(const std::string& vara,
 				      const std::string& varb) const {
 
@@ -632,8 +678,8 @@ ScatterGraph* Bunch::AmplitudeScatter(const std::string& vara,
     scat = drawer.NewAmplitudeScatter(_name, vara, varb);
     std::vector<double> x(Samples(vara)), y(Samples(varb)), z(_amps);
     scat->SetPoints(Size(), &x[0], &y[0], &z[0]);
-    scat->SetOrder(descending);
     scat->SetMaxSize(1e4);
+    scat->SetOrder(descending);
     return scat;
   } catch ( Exceptions::Exception& e ) {
     throw(Exceptions::Exception(Exceptions::nonRecoverable,
@@ -702,6 +748,21 @@ std::vector<double> Bunch::TotalMomenta() const {
   for (i = 0; i < Size(); i++)
       ptots.push_back(TotalMomentum(i));
   return ptots;
+}
+
+double Bunch::Deviation(const size_t i, const double& mean) const {
+
+  return (TotalMomentum(i)-mean)/mean;
+}
+
+std::vector<double> Bunch::Deviations() const {
+
+  double mean = Mean("ptot").GetValue();
+  std::vector<double> devs;
+  size_t i;
+  for (i = 0; i < Size(); i++)
+      devs.push_back(Deviation(i, mean));
+  return devs;
 }
 
 double Bunch::TotalMomentumError(const size_t i) const {
@@ -892,7 +953,23 @@ void Bunch::SetAmplitudeQuantile(const double& qamp) {
   DChiSquared fchi2(_dim);
   double eps = NormEmittanceEstimate(amp).GetValue();
   double density = fchi2(qamp/eps)/eps;
-  _qamp.SetSError(Math::QuantileSError(Size(), _fraction, density));
+  _qamp.SetSError(Math::QuantileSError(CoreSize()/_fraction, _fraction, density));
+}
+
+void Bunch::SetDensityQuantile(const double& qlev) {
+
+  // Set the value
+  _qlev.SetValue(qlev);
+
+  // Set the statistical uncertainty based on the Gaussian core assumption
+  DGaus gaus(_dim);
+  double factor = sqrt(2.)*pow(_fraction*(1.-_fraction), -.25);
+  _qlev.SetSError(factor*qlev/sqrt(CoreSize()/_fraction)); // Fit to the observed
+/*  double R2 = TMath::ChisquareQuantile(_fraction, _dim);
+  double ratio = exp(-R2/2.);
+  double scale = (ratio/qlev)/pow(2*M_PI, (double)_dim/2);
+  double density = scale*_dim*Math::UnitBallVolume(_dim)*pow(-2*log(ratio), (double)_dim/2-1);
+  _qlev.SetSError(Math::QuantileSError(CoreSize()/_fraction, _fraction, density));*/
 }
 
 double Bunch::NormEmittanceValue(const Matrix<double>& covmat) const {
@@ -916,18 +993,15 @@ void Bunch::SetAmplitudes() {
 }
 
 double Bunch::AmplitudeValue(const Matrix<double>& invcovmat,
-			    const std::vector<double>& means,
-			    const std::vector<double>& vec,
-			    const double& neps) const {
+			     const std::vector<double>& means,
+			     const std::vector<double>& vec,
+			     const double& neps) const {
 
-  double amp(0.), temp;
+  double amp(0.);
   size_t i, j;
-  for (i = 0; i < _dim; i++) {
-    temp = 0.;
-    for (j = 0; j < _dim; j++)
-        temp += invcovmat[i][j]*(vec[j]-means[j]);
-    amp += (vec[i]-means[i])*temp;
-  }
+  for (i = 0; i < _dim; i++)
+    for (j = i; j < _dim; j++)
+        amp += pow(2., (int)(i!=j))*(vec[i]-means[i])*invcovmat[i][j]*(vec[j]-means[j]);
 
   return neps*amp;
 }

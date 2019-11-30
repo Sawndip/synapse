@@ -91,6 +91,15 @@ class ScatterGraph {
   /** @brief Returns the number of entries in the underlying TGraph2D */
   size_t GetN() const	    					{ return _graph->GetN(); }
 
+  /** @brief Returns a pointer to the underlying array of x values */
+  double* GetX() const	    					{ return _graph->GetX(); }
+
+  /** @brief Returns a pointer to the underlying array of y values */
+  double* GetY() const	    					{ return _graph->GetY(); }
+
+  /** @brief Returns a pointer to the underlying array of z values */
+  double* GetZ() const	    					{ return _graph->GetZ(); }
+
   /** @brief Returns the the underlying TGraph2D */
   TGraph2D* GetGraph2D()	    				{ return _graph; }
 

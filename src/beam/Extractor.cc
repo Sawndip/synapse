@@ -46,10 +46,11 @@ const std::vector<std::string> Extractor::GetListOfKeys() const {
 
 Bunch Extractor::GetBunch(const std::string& data_type,
 		          const size_t plane_id,
+		   	  size_t maxn,
 		          const bool measerr) const {
   try {
     Pitch::print(Pitch::debug, "Calling GetStream() with one plane id", "Extractor::GetBunch");
-    return GetStream(data_type, {plane_id}, measerr)[plane_id];
+    return GetStream(data_type, {plane_id}, maxn, measerr)[plane_id];
   } catch ( Exceptions::Exception& e ) {
     throw(Exceptions::Exception(Exceptions::nonRecoverable,
 	  "Could not get the bunch at "+std::to_string((int)plane_id)+std::string(e.what()),
@@ -59,13 +60,14 @@ Bunch Extractor::GetBunch(const std::string& data_type,
 
 Stream Extractor::GetStream(const std::string& data_type,
 	    	 	    const std::vector<size_t> plane_ids,
+		   	    size_t maxn,
 			    const bool measerr) const {
 
   try {
     Pitch::print(Pitch::debug, "Calling GetStreams() with one data type", "Extractor::GetStreams");
     std::map<std::string, std::vector<size_t>> plane_ids_map;
     plane_ids_map[data_type] = plane_ids;
-    return GetStreams({data_type}, plane_ids_map, measerr).at(data_type);
+    return GetStreams({data_type}, plane_ids_map, maxn, measerr).at(data_type);
   } catch ( Exceptions::Exception& e ) {
     throw(Exceptions::Exception(Exceptions::nonRecoverable,
 	  "Could not get the stream for "+DataTypeName[data_type]+std::string(e.what()),
@@ -76,6 +78,7 @@ Stream Extractor::GetStream(const std::string& data_type,
 std::map<std::string, Stream>
 	Extractor::GetStreams(const std::vector<std::string>& data_types,
 	    	 	      const std::map<std::string, std::vector<size_t>> plane_ids,
+		   	      size_t maxn,
 			      const bool measerr) const {
 
   // Sort the plane IDs for the binary search
@@ -85,6 +88,10 @@ std::map<std::string, Stream>
       ids[type] = plane_ids.at(type);
       std::sort(ids[type].begin(), ids[type].end());
     }
+
+  // If maxn is 0, do not set a limit on the amount of particles to extract
+  if ( !maxn )
+      maxn = ULONG_MAX;
 
   // Loop over the data files and extract the requested data
   std::map<std::string, std::map<size_t, BunchMap>> samples, errors;
@@ -107,13 +114,15 @@ std::map<std::string, Stream>
         size_t off = mctruth ? 0 : 1;
 
         ProgressBar pbar(Pitch::debug);
-        for (i = 0; i < n; ++i) {
-
+        i = 0;
+	while ( i < n && reaches[type].size() < maxn ) {
           // Display the progress in %
           pbar.GetProgress(i, n);
 
 	  // Fetch the variables from the Ntuple
 	  tree->GetEntry(i);
+	  i++;
+
 	  ntuple = tree->GetArgs();
 	  plane_id = mctruth ? ntuple[2] : ntuple[2]*5+ntuple[3];
 

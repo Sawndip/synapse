@@ -21,4 +21,4 @@
  */
 bool FitCircle(const std::vector<double>& x,
 	       const std::vector<double>& y,
-               double& x0, double& y0, double& rad);
+	       double& x0, double& y0, double& rad);

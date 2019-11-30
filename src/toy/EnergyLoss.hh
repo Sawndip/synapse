@@ -1,3 +1,6 @@
+#ifndef ENERGYLOSS_HH
+#define ENERGYLOSS_HH
+
 // C++ includes
 #include <iostream>
 #include <ctime>
@@ -5,25 +8,14 @@
 #include <vector>
 #include <map>
 
+// ROOT includes
+#include "TF1.h"
+#include "TCanvas.h"
+
 // Additional includes
 #include "Assert.hh"
 #include "Pitch.hh"
-
-
-/** @brief Data structure that stores the material properties.
- *
- * 	   Needs to be provided with the material characteristics.
- */
-struct Material {
-  std::string	name;	///< Name of the element/molecule/crystal
-  double	Z;	///< Effective atomic number
-  double	A;	///< Atomic mass [g/mol]
-  double	rho;	///< Density [g/cm^3]
-  double	I;	///< Mean excitation potential [eV]
-  double	k1;	///< First factor of the energy loss [MeV/mm]
-  double	k2;	///< Second factor of the energy loss
-};
-
+#include "MaterialDefinitions.hh"
 
 /** @brief Computes the ionisation energy loss of a particle through a specfied Material
  *
@@ -36,8 +28,8 @@ class EnergyLoss {
 
   /** @brief Proper constructor, initilizes everything to the provided material
    *
-   *  @param	mat		Properties of the absorber material
-   *  @param	thickness	Thickness of the absorber [mm]
+   *  @param	mat		Properties of the material
+   *  @param	thickness	Thickness of the material [mm]
    */
   EnergyLoss(const Material& mat,
 	     const double& thickness);
@@ -64,6 +56,16 @@ class EnergyLoss {
   double GetMomentumLoss(const double& p,
 			 const double& m) const;
 
+  /** @brief Returns the mean momentum loss for a given particle
+   *
+   *  @param	p	Input momentum
+   *  @param	m	Input particle mass
+   *
+   *  @return		Momentum loss [MeV/c]
+   */
+  double GetApproxMomentumLoss(const double& p,
+			       const double& m) const;
+
   /** @brief Returns the most probable momentum loss for a given particle
    *
    *  @param	p	Input momentum
@@ -84,32 +86,55 @@ class EnergyLoss {
 		   const double& p,
 		   const double& m) const;
 
-  /** @brief Returns the Bethe-Bloch stopping formula
+  /** @brief Returns the total stopping power of the material
    *
    *  @param	bg	Relativistic &beta;&gamma; (p/m)
    *
+   *  @return		Value of the stopping power in &beta;&gamma; [MeV/mm]
+   */
+  double StoppingPower(const double& bg) const;
+
+  /** @brief Returns the Bethe-Bloch stopping formula
+   *
+   *  @param	bg	Relativistic &beta;&gamma; (p/m)
+   *  @param	el	Element through which the particle is going
+   *
    *  @return		Value of the formula in &beta;&gamma; [MeV/mm]
    */
-  double BetheBloch(const double& bg) const;
+  double BetheBloch(const double& bg,
+		    const Element& el) const;
 
-  /** @brief Gets the thickness in amount of radiation length */
+  /** @brief Returns the delta function, a fit to the density effect
+   *
+   *  @param	bg	Relativistic &beta;&gamma; (p/m)
+   *  @param	el	Element through which the particle is going
+   *
+   *  @return		Value of the function in &beta;&gamma
+   */
+  double DeltaFunction(const double& bg,
+		       const Element& el) const;
+
+  /** @brief Sets the material definition */
+  void SetMaterial(const Material& mat);
+
+  /** @brief Gets the material definition */
   const Material& GetMaterial()	const		{ return _mat; }
-
-  /** @brief Sets the thickness in amount of radiation length */
-  void SetStepSize(const double& stepsize)	{ _stepsize = stepsize; }
-
-  /** @brief Gets the thickness in amount of radiation length */
-  const double& GetStepSize()	const		{ return _stepsize; }
 
   /** @brief Sets the thickness in amount of radiation length */
   void SetThickness(const double& thickness)	{ _thickness = thickness; }
 
   /** @brief Gets the thickness in amount of radiation length */
-  const double& GetThickness()	const		{ return _thickness; }
+  const double& GetThickness() const		{ return _thickness; }
+
+  /** @brief Draws and saves the Bethe-Bloch function as a function of &beta;&gamma; */
+  void DrawBetheBloch() const;
 
  private:
 
-  Material _mat;	///< Description of the absorber material
-  double _stepsize;	///< Size of a step through the absorber
-  double _thickness;	///< Thickness of the absorber
+  Material 		_mat;		///< Description of the materials
+  double 		_thickness;	///< Thickness of the absorber
+  std::vector<double> 	_params;	///< ROOT material parameters
+  double		_Kstar;		///< Approximate energy loss prefactor
 };
+
+#endif

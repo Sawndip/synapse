@@ -38,7 +38,7 @@ class Global {
   Global(const Global& global)			{ *this = global; }
 
   /** @brief Equality operator */
-  Global& operator=(const Global& global)	{ _val = global._val; 
+  Global& operator=(const Global& global)	{ _val = global._val;
 						  _des = global._des;
 						  return *this; }
   /** @brief Destructor */
@@ -136,12 +136,15 @@ class Globals {
   /** @brief Returns the requested global variable */
   const Global& operator[](const std::string& var) const;
 
+  /** @brief Check that the provided data files are of the right type */
+  void CheckDataFiles(const std::string& type) const;
+
   /** @brief Print the list of datacards and their value */
   void Print(Pitch::errorLevel level=Pitch::info) const;
 
  private:
 
-  /** @brief Command line construct, takes extra arguments from the command line 
+  /** @brief Command line construct, takes extra arguments from the command line
    *
    *  @param	argc	Number of command line arguments
    *  @param	argv	List of command line arguments
@@ -171,6 +174,9 @@ class Globals {
 
   /** @brief Loads the geometry handler */
   void LoadGeometry();
+
+  /** @brief Sets the verbosity of Pitch */
+  void SetVerbosity();
 
   /** @brief Sets the default style of the ROOT plots */
   void SetDefaultStyle();

@@ -35,9 +35,9 @@ if (MAUS_LIBRARY_DIR)
                        )
 
 
-  set(MAUS_INCLUDE_DIR  $ENV{MAUS_THIRD_PARTY}
-                        $ENV{MAUS_THIRD_PARTY}/third_party/install/include
+  set(MAUS_INCLUDE_DIR  $ENV{MAUS_THIRD_PARTY}/third_party/install/include
                         $ENV{MAUS_THIRD_PARTY}/third_party/install/include/python2.7
+			$ENV{MAUS_ROOT_DIR}
                         $ENV{MAUS_ROOT_DIR}/src/common_cpp
                         $ENV{MAUS_ROOT_DIR}/src/legacy
                         $ENV{MAUS_ROOT_DIR}/src/map

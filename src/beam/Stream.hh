@@ -20,7 +20,7 @@ namespace Beam {
 /** @brief Holds a set of particle bunches
  *
  *	   Holds particle bunches at an array of z positions, or planes, to evaluate global
- * 	   characteristics of a stream of particle along a the full extent of a beam line.
+ * 	   characteristics of a stream of particles along a the full extent of a beam line.
  */
 class Stream {
  public:
@@ -32,7 +32,7 @@ class Stream {
    *  @param	bunches		Dictionary that maps each plane id onto a Bunch
    *  @param	reaches		Reach of each particle in the beam (max plane id)
    */
-  Stream(const std::map<size_t, Bunch>& samples,
+  Stream(const std::map<size_t, Bunch>& bunches,
 	 const std::vector<size_t> reaches = std::vector<size_t>());
 
   /** @brief Copy constructor */
@@ -78,7 +78,20 @@ class Stream {
   double Transmission(const size_t plane_id) const;
 
   /** @brief Sets the core fraction of all the bunches in the stream */
-  void SetCoreFraction(const double frac);
+  void SetCoreFraction(const double frac,
+		       const std::string fom="amp");
+
+  /** @brief Returns the change in the summary statistic between two planes
+   *
+   *  @param 	stat	Tag of the summary statistic
+   *  @param 	idu	Id of the upstream plane
+   *  @param 	idd	Id of the downstream plane
+   *
+   *  @return		Change and its uncertainty (variable)
+   */
+  Variable Change(const SumStat& stat,
+		  const size_t idu,
+		  const size_t idd) const;
 
   /** @brief Returns an evolution graph of the requested statistic 
    *
@@ -113,7 +126,8 @@ class Stream {
   void Initialize();
 
   /** @brief Sets the number of particles contained in the core of all the bunches in the stream */
-  void SetCoreSize(const size_t size);
+  void SetCoreSize(const size_t size,
+		   const std::string fom="amp");
 
   /** @brief Returns true if the stream contains the requested plane id */
   bool Contains(const size_t plane_id) const;

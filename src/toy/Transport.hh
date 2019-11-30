@@ -1,3 +1,6 @@
+#ifndef TRANSPORT_HH
+#define TRANSPORT_HH
+
 // C++ includes
 #include <iostream>
 #include <ctime>
@@ -82,3 +85,5 @@ class Transport {
   Matrix<double> 		_M;	///< Transfer matrix
   std::vector<Matrix<double>>	_T;	///< Second order transfer 3-tensor
 };
+
+#endif

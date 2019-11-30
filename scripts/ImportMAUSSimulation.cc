@@ -406,26 +406,26 @@ int main(int argc, char ** argv) {
     // Print the counters to a data file
     ofstream fcounters;
     fcounters.open("diag_counters.txt");
-    fcounters << "Truth" << "\n";
-    fcounters << "Event\t" << counters["evt"] << "\n";
-    fcounters << "TOF0 SP\t" << counters["tof0"] << "\n";
-    fcounters << "TOF1 SP\t" << counters["tof1"] << "\n";
-    fcounters << "Both TOFs\t" << counters["none"] << "\n";
-    fcounters << "Muon\t" << counters["pid"] << "\n";
+    fcounters << std::left << std::setw(20) << "Truth" << "\n";
+    fcounters << std::left << std::setw(20) << "Event" << counters["evt"] << "\n";
+    fcounters << std::left << std::setw(20) << "TOF0 SP" << counters["tof0"] << "\n";
+    fcounters << std::left << std::setw(20) << "TOF1 SP" << counters["tof1"] << "\n";
+    fcounters << std::left << std::setw(20) << "Both TOFs" << counters["none"] << "\n";
+    fcounters << std::left << std::setw(20) << "Muon" << counters["pid"] << "\n";
     fcounters << "\n";
-    fcounters << "TKU Event\t" << counters["tkuevt"] << "\n";
-    fcounters << "TKU Reference\t" << counters["ref"] << "\n";
-    fcounters << "TKU Quality\t" << counters["qual"] << "\n";
-    fcounters << "TKU Fiducial\t" << counters["fid"] << "\n";
-    fcounters << "TKU Momentum\t" << counters["mom"] << "\n";
-    fcounters << "TKU All\t" << counters["all"] << "\n";
+    fcounters << std::left << std::setw(20) << "TKU Event" << counters["tkuevt"] << "\n";
+    fcounters << std::left << std::setw(20) << "TKU Reference" << counters["ref"] << "\n";
+    fcounters << std::left << std::setw(20) << "TKU Quality" << counters["qual"] << "\n";
+    fcounters << std::left << std::setw(20) << "TKU Fiducial" << counters["fid"] << "\n";
+    fcounters << std::left << std::setw(20) << "TKU Momentum" << counters["mom"] << "\n";
+    fcounters << std::left << std::setw(20) << "TKU All" << counters["all"] << "\n";
     fcounters << "\n";
-    fcounters << "TKD Event\t" << counters["tkdevt"] << "\n";
-    fcounters << "TKD Reference\t" << counters["tkdref"] << "\n";
-    fcounters << "TKD Quality\t" << counters["tkdqual"] << "\n";
-    fcounters << "TKD Fiducial\t" << counters["tkdfid"] << "\n";
-    fcounters << "TKD Momentum\t" << counters["tkdmom"] << "\n";
-    fcounters << "TKD All\t" << counters["tkdall"] << "\n";
+    fcounters << std::left << std::setw(20) << "TKD Event" << counters["tkdevt"] << "\n";
+    fcounters << std::left << std::setw(20) << "TKD Reference" << counters["tkdref"] << "\n";
+    fcounters << std::left << std::setw(20) << "TKD Quality" << counters["tkdqual"] << "\n";
+    fcounters << std::left << std::setw(20) << "TKD Fiducial" << counters["tkdfid"] << "\n";
+    fcounters << std::left << std::setw(20) << "TKD Momentum" << counters["tkdmom"] << "\n";
+    fcounters << std::left << std::setw(20) << "TKD All" << counters["tkdall"] << "\n";
     fcounters.close();
 
     // Initialize the RMS ellipses from the recorded means and covariances (+ frames)

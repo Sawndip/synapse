@@ -103,8 +103,14 @@ class Bunch {
   /** @brief Returns the array of samples of variable var */
   const std::vector<double>& Samples(const std::string var) const;
 
+  /** @brief Returns the array of core samples of variable var */
+  const std::vector<double>& CoreSamples(const std::string var) const;
+
   /** @brief Returns the array of errors on the samples of variable var */
   const std::vector<double>& Errors(const std::string var) const;
+
+  /** @brief Returns the array of errors on the core samples of variable var */
+  const std::vector<double>& CoreErrors(const std::string var) const;
 
   /** @brief Returns the radius of the i^th sample */
   double Radius(const size_t i) const;
@@ -117,6 +123,9 @@ class Bunch {
 
   /** @brief Returns the covariance matrix of the bunch */
   const Matrix<double>& CovarianceMatrix() const	{ return _data.S(); }
+
+  /** @brief Returns the covariance matrix of the cores sample of the bunch */
+  const Matrix<double>& CoreCovarianceMatrix() const	{ return _core.S(); }
 
   /** @brief Returns the Twiss parameter alpha of the bunch */
   const Variable& Alpha() const				{ return _alpha; }
@@ -139,6 +148,9 @@ class Bunch {
   /** @brief Returns the mechanical angular momentum of the bunch */
   const Variable& MechanicalL() const			{ return _mecl; }
 
+  /** @brief Returns the dispersion of the bunch */
+  Variable Dispersion() const;
+
   /** @brief Returns the RMS normalised emittance of the bunch */
   const Variable& Emittance() const			{ return _eps; }
 
@@ -154,6 +166,9 @@ class Bunch {
   /** @brief Returns the maximum amplitude in the core */
   const Variable& AmplitudeQuantile() const		{ return _qamp; }
 
+  /** @brief Returns the minimum density in the core */
+  const Variable& DensityQuantile() const		{ return _qlev; }
+
   /** @brief Returns the estimated normalised emittance from the measured fractional quantity */
   Variable NormEmittanceEstimate(const SumStat& stat) const;
 
@@ -166,20 +181,30 @@ class Bunch {
   /** @brief Returns the array of Voronoi volumes of the samples */
   const std::vector<double>& VoronoiVolumes() const	{ return _vols; }
 
+  /** @brief Returns the nonparametric density in each particle */
+  const DensityEstimator& DensityEstimate() const	{ return _de; }
+
+  /** @brief Returns the nonparametric density in each particle */
+  const std::vector<double>& DensityLevels() const	{ return _de.DensityLevels(); }
+
   /** @brief Defines the fraction the core represents (in case of transmission losses) */
   void SetFraction(const double frac)			{ _fraction = frac; }
 
   /** @brief Defines the fraction of the beam contained in the core
    *
    *  @param	frac	Fraction of the initial bunch to be kept
+   *  @param	fom	Figure of merit that determines the core
    */
-  void SetCoreFraction(const double frac);
+  void SetCoreFraction(const double frac,
+		       const std::string fom="amp");
 
   /** @brief Assigns a certain amount of core particles
    *
    *  @param	size	Number of particles to be kept
+   *  @param	fom	Figure of merit that determines the core
    */
-  void SetCoreSize(const size_t size);
+  void SetCoreSize(const size_t size,
+		   const std::string fom="amp");
 
   /** @brief Computes the volume of the fraction of the beam contained in the core
    * 
@@ -199,13 +224,6 @@ class Bunch {
    */
   void SetMCDAmplitudes();
 
-  /** @brief Compute the generalised transverse amplitude of every particle in the sample 
-	     by basing it on density estimation and contour volume rather than covariance.
-   *
-   *  @param 	norm	Normalisation constant (if the distribution is truncated)
-   */
-  void SetGeneralisedAmplitudes(const double norm=1.);
-
   /** @brief Compute the Voronoi volumes around each particle
    *
    *	     This is not done by default as it takes a long time (need to tesselate the 4D space).
@@ -213,6 +231,16 @@ class Bunch {
    *	     Does not do anything if it has already been called.
    */
   void SetVoronoiVolumes();
+
+  /** @brief Compute the nonparametric density in each particle
+   *
+   *	     This is not done by default as it takes a long time
+   *
+   *	     Does not do anything if it has already been called.
+   *
+   *  @param 	norm	Normalisation constant (if the distribution is truncated)
+   */
+  void SetDensityLevels(const double norm=1.);
 
   /** @brief Returns the n-RMS ellipse of a sample of two variables
    *
@@ -270,6 +298,24 @@ class Bunch {
 	 	  double minb=0,
 		  double maxb=0) const;
 
+  /** @brief Returns a 2D histogram of the density estimator in the requested axis
+   *
+   *  @param 	vara	First variable of which to draw the distribution
+   *  @param 	varb	Second variable of which to draw the distribution
+   *  @param 	mina	Minimum of the range of vara
+   *  @param 	maxa	Maximum of the range of vara
+   *  @param 	minb	Minimum of the range of varb
+   *  @param 	maxb	Maximum of the range of varb
+   *  @param	x	Point that the projection intersects
+   */
+  TH2F* DensityGraph(const std::string& vara, 
+		     const std::string& varb,
+		     double mina=0, 
+		     double maxa=0,
+	 	     double minb=0,
+		     double maxb=0,
+		     std::vector<double> x=std::vector<double>()) const;
+
   /** @brief Returns the 2D scatter plot of particle amplitudes
    *
    *  @param 	vara	First variable of which to draw the amplitude scatter plot
@@ -279,6 +325,12 @@ class Bunch {
    */
   ScatterGraph* AmplitudeScatter(const std::string& vara,
 			     	 const std::string& varb) const;
+
+  /** @brief Returns the momentum deviation of a given sample of central momentum mean */
+  double Deviation(const size_t i, const double& mean) const;
+
+  /** @brief Returns the momentum deviation of all the samples */
+  std::vector<double> Deviations() const;
 
  private:
 
@@ -351,6 +403,9 @@ class Bunch {
   /** @brief Sets the amplitude quantile and its uncertainty */
   void SetAmplitudeQuantile(const double& qamp);
 
+  /** @brief Sets the density quantile and its uncertainty */
+  void SetDensityQuantile(const double& qlev);
+
   /** @brief Computes the RMS emittance provided with the covariance matrix */
   double NormEmittanceValue(const Matrix<double>& covmat) const;
 
@@ -385,6 +440,7 @@ class Bunch {
   Variable			_seps;		///< Subemittance
   Variable			_feps;		///< Fractional emittance
   Variable			_qamp;		///< Lagest amplitude in the core
+  Variable			_qlev;		///< Lowest density level in the core
   std::vector<double>  		_amps;		///< Amplitudes of the particles
   std::vector<double>		_vols;		///< Voronoi cell volumes of the particles
   DensityEstimator		_de;		///< Density estimation of the bunch

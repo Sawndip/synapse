@@ -3,8 +3,6 @@
 
 // C++ includes
 #include <iostream>
-#include <ctime>
-#include <cmath>
 #include <vector>
 #include <map>
 
@@ -12,21 +10,11 @@
 #include "TPolyLine.h"
 
 // QHULL includes
-#include "PointCoordinates.h"
-#include "RboxPoints.h"
-#include "QhullError.h"
 #include "Qhull.h"
-#include "QhullQh.h"
-#include "QhullFacet.h"
-#include "QhullFacetList.h"
-#include "QhullFacetSet.h"
-#include "QhullLinkedList.h"
-#include "QhullVertex.h"
-#include "QhullSet.h"
 #include "QhullVertexSet.h"
+#include "QhullFacetList.h"
 
 // Additional includes
-#include "Matrix.hh"
 #include "Vertex.hh"
 #include "Geometry.hh"
 
@@ -35,7 +23,7 @@
  *	   The Delaunay triangulation is obtained by computing the (n+1)-dimensional
  *	   convex hull of the points by adding the L2 vector norm as an additional coordinate.
  *	   This forms a paraboloid which projected bottom end corresponds to the triangulation.
- *         Qhull performs the heavy lifting, this is a front end class.
+ *     Qhull performs the heavy lifting, this is a front end class.
  */
 class Delaunay {
  public:
@@ -85,7 +73,7 @@ class Delaunay {
 
   size_t 				_dim;		///< Dimension of the space
   std::vector<Vertex>			_vertices;	///< Vector of N vertices
-  std::map<size_t, std::vector<Vertex>>	_facets;	///< Map of facets (simplices)
+  std::map<size_t, std::vector<Vertex>> _facets;	///< Map of facets (simplices)
   orgQhull::Qhull*			_qhull;		///< Pointer to qhull object, owns the memory
 };
 

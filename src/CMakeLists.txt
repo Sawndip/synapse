@@ -3,7 +3,6 @@ cmake_minimum_required(VERSION 2.8.0 FATAL_ERROR)
 message("\n Creating the SynAPSE library...")
 
 # Add the files to be compiled into a library
-message("\n Creating the SynAPSE library...")
 aux_source_directory (	${CMAKE_BINARY_DIR}/../src/exc 		EXCEPTION_SRC)
 aux_source_directory (	${CMAKE_BINARY_DIR}/../src/utils	UTILS_SRC)
 aux_source_directory (	${CMAKE_BINARY_DIR}/../src/math 	MATH_SRC)

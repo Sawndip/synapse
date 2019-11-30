@@ -1,3 +1,6 @@
+#ifndef FIELDHANDLER_HH
+#define FIELDHANDLER_HH
+
 // C++ includes
 #include <iostream>
 #include <ctime>
@@ -124,3 +127,5 @@ class FieldHandler {
   double				_mu0;		///< Vacuum permeability
   std::map<std::string, FieldElement>	_fields;	///< List of fields in the beam line
 };
+
+#endif

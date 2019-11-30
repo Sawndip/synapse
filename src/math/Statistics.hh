@@ -292,11 +292,13 @@ Matrix<double> CovarianceMatrix(const Matrix<double>& mat);
 /** @brief Returns the MCD robust covariance matrix of a multivariate sample
  *
  *  @param	mat	Matrix that contains the relevant sample
+ *  @param	mean	Robust mean of the distribution
  *  @param 	hh	Number of elements in the subsamble of which to get the MCD
  *
  *  @return		Robust covariance matrix
  */ 
 Matrix<double> RobustCovarianceMatrix(const Matrix<double>& mat,
+				      std::vector<double>& mean,
 				      const double hh=0);
 
 /** @brief Removes an element array from a precomputed covariance matrix

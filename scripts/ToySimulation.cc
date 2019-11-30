@@ -1,52 +1,19 @@
 // Cpp includes
-#include <ctime>
-#include <cmath>
 #include <iostream>
-#include <fstream>
-#include <algorithm>
-#include <regex>
+#include <vector>
 #include <map>
-#include <chrono>
-
-// Root includes
-#include "TROOT.h"
-#include "TSystem.h"
-#include "TStyle.h"
-#include "TObject.h"
-#include "TString.h"
-#include "TFile.h"
-#include "TNtuple.h"
-#include "TTree.h"
-#include "TCanvas.h"
-#include "TH1.h"
-#include "TH2.h"
-#include "THStack.h"
-#include "TF1.h"
-#include "TVector3.h"
-#include "TMath.h"
-#include "TLegend.h"
-#include "TGraphErrors.h"
-#include "TMultiGraph.h"
-#include "TRandom3.h"
-#include "TCanvas.h"
 
 // Additional modules
-#include "Pitch.hh"
-#include "ProgressBar.hh"
-#include "InfoBox.hh"
-#include "Bunch.hh"
+#include "Globals.hh"
+#include "Extractor.hh"
+#include "Generator.hh"
 #include "Scattering.hh"
 #include "EnergyLoss.hh"
 #include "Transport.hh"
-#include "ToyTools.hh"
-#include "DChiSquared.hh"
-#include "Globals.hh"
 
 /** @file  ToySimulation.cc
  *
  *  @brief Runs a toy simulation of the beam line.
- *
- *	   Measures the evolution of phase space parameters across a toy absorber.
  *
  *	   Supports the addition of drift spaces, solenoids and apertures.
  **/
@@ -75,6 +42,318 @@ double RelativeAmplitudeChangeDistribution(double *x, double *par) {
 double ChiSquaredDist(double x, double d) {
 
   return  exp(-x/2)*pow(x, d/2-1)/pow(2, d/2)/tgamma(d/2);
+}
+
+void AddPoint(TGraphErrors* graph, const size_t id,
+		const Beam::Variable& in, const Beam::Variable& out) {
+
+}
+
+/** @brief Sets the style of the graph depending on the summary statistic being represented
+ *
+ *  @param	graph		Input graph
+ *  @param	stat		Summary statistic
+ **/
+std::map<Beam::SumStat, int> colors =
+	{{Beam::eps, kBlack}, {Beam::amp, kGreen+2}, {Beam::subeps, kRed+1}, {Beam::vol, kBlue+1}};
+std::map<Beam::SumStat, int> markers =
+	{{Beam::eps, 20}, {Beam::amp, 24}, {Beam::subeps, 25}, {Beam::vol, 26}};
+void SetStyle(TGraphErrors* graph, const Beam::SumStat& stat) {
+
+  // Set the titles
+  graph->SetTitle(TString::Format("%s, %s_{#alpha}",
+	Beam::SumStatDict[stat].title.c_str(), Beam::SumStatDict[stat].label.c_str()));
+  graph->GetXaxis()->SetTitle("Fraction #alpha");
+  graph->GetYaxis()->SetTitle(TString::Format("#Delta%s_{#alpha}/%s_{#alpha}^{in} [%%]",
+	Beam::SumStatDict[stat].label.c_str(), Beam::SumStatDict[stat].label.c_str()));
+
+  // Set the color and style of markers
+  graph->SetMarkerStyle(markers[stat]);
+  graph->SetLineColor(colors[stat]);
+  graph->SetMarkerSize(2);
+  graph->SetLineWidth(3);
+  graph->SetFillStyle(0);
+}
+
+/** @brief Builds the legend associated with a multigraph
+ *
+ *  @param	graph		Input multigraph
+ *
+ *  @return			Legend object
+ **/
+void BuildLegend(TMultiGraph* graph) {
+
+  // Initialize
+  double h = graph->GetListOfGraphs()->GetSize()*.06;
+//  TLegend* leg = new TLegend(.12, .88-h, .36, .88);
+  TLegend* leg = new TLegend(.58, .88-h, .88, .88);
+  leg->SetLineColorAlpha(0, 0);
+
+  // Loop over graphs, add entries
+  for(const TObject* obj: *graph->GetListOfGraphs())
+      leg->AddEntry(obj, obj->GetTitle(), "EP");
+
+  // Draw
+  leg->Draw("SAME");
+}
+
+/** @brief Produces a fractional graph
+ *
+ *	   For a beam core fractions between 5 and 100%, calculate the relative change
+ *	   in the requested fractional summary statistics. Returns the relative change
+ *	   as a function of the fraction in the form of a TGraphErrors
+ *
+ *  @param	stream		Stream of particles (upstream = 0, downstream = 1)
+ *  @param	stats		Summary statistics
+ *
+ *  @return			TMultiGraph showing the changes as a function of alpha
+ **/
+TMultiGraph* FractionalGraph(Beam::Stream& stream,
+			     const std::vector<Beam::SumStat>& stats) {
+
+  // Throw if one of the requested quantity is not fractional
+  for (const Beam::SumStat& stat : stats)
+    if ( !Beam::SumStatDict[stat].frac )
+        throw(Exceptions::Exception(Exceptions::nonRecoverable,
+	      "The requested quantity is not fractional: "+Beam::SumStatDict[stat].name,
+	      "FractionalGraph"));
+
+  // Initialize the individual graphs, set style
+  TMultiGraph* mg = new TMultiGraph();
+  std::map<Beam::SumStat, TGraphErrors*> graphs;
+  for (const Beam::SumStat& stat : stats) {
+    graphs[stat] = new TGraphErrors();
+    SetStyle(graphs[stat], stat);
+    mg->Add(graphs[stat], "PE");
+  }
+
+  // Loop over the fractions between 5 and 100% by steps of 5%
+  double temp, max(1.), min(.05), step(.05);
+  double in, out, ine, oute, value, error;
+  size_t size = (size_t)((max+1e-3-min)/step);
+  double transmission = stream.Transmission(1);
+  ProgressBar pbar;
+  for (size_t i = 0; i < size; i++) {
+    // Current fraction
+    temp = min + i*step;
+
+    // Skip fraction if above transmission
+    if ( transmission < temp )
+	continue;
+
+    // Set the core fraction of the two bunches in the stream.
+    stream.SetCoreFraction(temp);
+
+    // For each requested variable, compute the change
+    for (const Beam::SumStat& stat : stats)  {
+      // If the summary statistic is the volume, set it
+      if ( stat == Beam::vol ) {
+	 stream[0].SetCoreVolume();
+	 stream[1].SetCoreVolume();
+      }
+
+      // Evaluate the change
+      in = stream[0].SummaryStatistic(stat).GetValue();
+      out = stream[1].SummaryStatistic(stat).GetValue();
+      ine = stream[0].SummaryStatistic(stat).GetError();
+      oute = stream[1].SummaryStatistic(stat).GetError();
+      value = (out-in)/in;
+      error = fabs(1.+value)*sqrt(pow(ine/in, 2)+pow(oute/out, 2));
+
+      if ( stat == Beam::vol ) {
+	value = sqrt(value+1.)-1.;
+	error /= 2.;
+      }
+
+      graphs[stat]->SetPoint(i, temp, 1e2*value);
+      graphs[stat]->SetPointError(i, 0., 1e2*error);
+    }
+
+    // Display the progress in %
+    pbar.GetProgress(i, size);
+  }
+
+  return mg;
+}
+
+/** @brief Produces a beta graph
+ *
+ *	   For variable absorber beta functions, calculate the relative change
+ *	   in the requested fractional summary statistics. Returns the relative change
+ *	   as a function of the beta function in the form of a TGraphErrors
+ *
+ *  @param	stream		Stream of particles (upstream = 0, downstream = 1)
+ *  @param	stats		Summary statistics
+ *
+ *  @return			TMultiGraph showing the changes as a function of alpha
+ **/
+TMultiGraph* BetaGraph(Beam::Stream& stream,
+		       const std::vector<Beam::SumStat>& stats) {
+
+  // Initialize the individual graphs, set style
+  TMultiGraph* mg = new TMultiGraph();
+  std::map<Beam::SumStat, TGraphErrors*> graphs;
+  for (const Beam::SumStat& stat : stats) {
+    graphs[stat] = new TGraphErrors();
+    SetStyle(graphs[stat], stat);
+    mg->Add(graphs[stat], "PE");
+  }
+
+  // Loop over beta functions between 100 mm and 1000 mm by steps of 100 mm
+  double temp, max(1000), min(100), step(100);
+  double in, out, ine, oute, value, error;
+  size_t size = (size_t)((max+1e-3-min)/step)+1;
+
+  Globals &globals = Globals::GetInstance();
+  Generator gen(globals["toy_dim"], globals["toy_mass"]);
+  Beam::BunchMap inmap, outmap;
+  std::cerr << "here" << std::endl;
+
+  double depth = 6.5;		// [cm], thickness of the absorber
+  double X_0 = 102.04;	 	// [cm], radiation length
+  Scattering scat(depth/X_0);
+
+  EnergyLoss eloss(AbsLiH, 10*depth);
+
+  ProgressBar pbar;
+  for (size_t i = 0; i < size; i++) {
+    // Current beta function
+    temp = min + i*step;
+
+    // Create a new input beam
+    gen.SetMatrixParametrisation(globals["toy_mom"], globals["toy_eps"], temp, globals["toy_alpha"]);
+    inmap.clear();
+    inmap = gen.GaussianBunchMap(globals["toy_n"]);
+    Beam::Bunch inbeam(inmap, 0., "in");
+
+    // Diffuse and scatter to create the output beam
+    outmap.clear();
+    outmap = inmap;
+    if ( globals["toy_scat"] )
+        scat.ScatterBunch(outmap, globals["toy_mom"], globals["toy_mass"]);
+    if ( globals["toy_eloss"] )
+        eloss.IonizeBunch(outmap, globals["toy_mom"], globals["toy_mass"]);
+    Beam::Bunch outbeam(outmap, 10*depth, "out");
+
+    // Set the core fraction of the two bunches in a common stream.
+    Beam::Stream stream({{0, inbeam}, {1, outbeam}});
+    stream.SetCoreFraction(globals["frac"]);
+
+    // For each requested variable, compute the change
+    for (const Beam::SumStat& stat : stats)  {
+      // If the summary statistic is the volume, set it
+      if ( stat == Beam::vol ) {
+	 stream[0].SetCoreVolume();
+	 stream[1].SetCoreVolume();
+      }
+
+      // Evaluate the change
+      in = stream[0].SummaryStatistic(stat).GetValue();
+      out = stream[1].SummaryStatistic(stat).GetValue();
+      ine = stream[0].SummaryStatistic(stat).GetError();
+      oute = stream[1].SummaryStatistic(stat).GetError();
+      value = (out-in)/in;
+      error = fabs(1.+value)*sqrt(pow(ine/in, 2)+pow(oute/out, 2));
+
+      graphs[stat]->SetPoint(i, temp, 1e2*value);
+      graphs[stat]->SetPointError(i, 0., 1e2*error);
+    }
+
+    // Display the progress in %
+    pbar.GetProgress(i, size);
+  }
+
+  return mg;
+}
+
+/** @brief Produces an emittance graph
+ *
+ *	   For variable input emittances, calculate the relative change
+ *	   in the requested fractional summary statistics. Returns the relative change
+ *	   as a function of the input emittance in the form of a TGraphErrors
+ *
+ *  @param	stream		Stream of particles (upstream = 0, downstream = 1)
+ *  @param	stats		Summary statistics
+ *
+ *  @return			TMultiGraph showing the changes as a function of alpha
+ **/
+TMultiGraph* EmittanceGraph(Beam::Stream& stream,
+			    const std::vector<Beam::SumStat>& stats) {
+
+  // Initialize the individual graphs, set style
+  TMultiGraph* mg = new TMultiGraph();
+  std::map<Beam::SumStat, TGraphErrors*> graphs;
+  for (const Beam::SumStat& stat : stats) {
+    graphs[stat] = new TGraphErrors();
+    SetStyle(graphs[stat], stat);
+    mg->Add(graphs[stat], "PE");
+  }
+
+  // Loop over beta functions between 100 mm and 1000 mm by steps of 100 mm
+  double temp, max(10), min(2), step(1);
+  double in, out, ine, oute, value, error;
+  size_t size = (size_t)((max+1e-3-min)/step)+1;
+
+  Globals &globals = Globals::GetInstance();
+  Generator gen(globals["toy_dim"], globals["toy_mass"]);
+  Beam::BunchMap inmap, outmap;
+
+  double depth = 6.5;		// [cm], thickness of the absorber
+  double X_0 = 102.04;	 	// [cm], radiation length
+  Scattering scat(depth/X_0);
+
+  EnergyLoss eloss(AbsLiH, 10*depth);
+  eloss.DrawBetheBloch();
+
+  ProgressBar pbar;
+  for (size_t i = 0; i < size; i++) {
+    // Current beta function
+    temp = min + i*step;
+
+    // Create a new input beam
+    gen.SetMatrixParametrisation(globals["toy_mom"], temp, globals["toy_beta"], globals["toy_alpha"]);
+    inmap.clear();
+    inmap = gen.GaussianBunchMap(globals["toy_n"]);
+    Beam::Bunch inbeam(inmap, 0., "in");
+
+    // Diffuse and scatter to create the output beam
+    outmap.clear();
+    outmap = inmap;
+    if ( globals["toy_scat"] )
+        scat.ScatterBunch(outmap, globals["toy_mom"], globals["toy_mass"]);
+    if ( globals["toy_eloss"] )
+        eloss.IonizeBunch(outmap, globals["toy_mom"], globals["toy_mass"]);
+    Beam::Bunch outbeam(outmap, 10*depth, "out");
+
+    // Set the core fraction of the two bunches in a common stream.
+    Beam::Stream stream({{0, inbeam}, {1, outbeam}});
+    stream.SetCoreFraction(globals["frac"]);
+
+    // For each requested variable, compute the change
+    for (const Beam::SumStat& stat : stats)  {
+      // If the summary statistic is the volume, set it
+      if ( stat == Beam::vol ) {
+	 stream[0].SetCoreVolume();
+	 stream[1].SetCoreVolume();
+      }
+
+      // Evaluate the change
+      in = stream[0].SummaryStatistic(stat).GetValue();
+      out = stream[1].SummaryStatistic(stat).GetValue();
+      ine = stream[0].SummaryStatistic(stat).GetError();
+      oute = stream[1].SummaryStatistic(stat).GetError();
+      value = (out-in)/in;
+      error = fabs(1.+value)*sqrt(pow(ine/in, 2)+pow(oute/out, 2));
+
+      graphs[stat]->SetPoint(i, temp, 1e2*value);
+      graphs[stat]->SetPointError(i, 0., 1e2*error);
+    }
+
+    // Display the progress in %
+    pbar.GetProgress(i, size);
+  }
+
+  return mg;
 }
 
 /** @brief	Main function
@@ -111,51 +390,12 @@ int main(int argc, char ** argv) {
   // Toy Monte Carlo variables
   std::vector<std::string> vars = {"x", "y", "px", "py", "pz"};
   
-  // Labels of the cooling variables
-  double frac = globals["frac"];
-  std::string frac_str = std::to_string((int)(100*frac));
-  std::vector<std::string> pars = {"meanp", "eps", "betax", "betay", "beta", "trans",
-	"subeps", "acut", "vol", "mode", "quan"};
-  std::vector<std::string> fracpars = {"acut", "subeps", "vol"};
-  std::map<std::string, std::string> par_labels = {{"meanp","#bar{p}"}, {"eps","#epsilon_{n}"}, 
-	{"betax","#beta_{x}"}, {"betay","#beta_{y}"}, {"beta","#beta_{#perp}"}, {"trans","T"},
-	{"subeps","e"}, {"acut","A"}, {"vol","#epsilon"}, {"mode","A_{#perp}^{*}"}, {"quan","P"}};
-  std::map<std::string, std::string> par_units = {{"meanp","MeV/c"}, {"eps","mm"},
-	{"betax","mm"}, {"betay","mm"}, {"beta","mm"}, {"trans","%"}, {"subeps","mm"},
-	{"acut","mm"}, {"vol","mm^{2}MeV^{2}/c^{2}"}, {"mode","mm"}, {"quan","mm"}};
-  std::map<std::string, std::string> par_titles =
-	{{"meanp","Mean total momentum"},
-	 {"eps","Normalised transverse RMS emittance"},
-	 {"betax","Optical beta function in x"},
-	 {"betay","Optical beta function in y"},
-	 {"beta","Transverse beta function"},
-	 {"trans","Tansmission"},
-	 {"subeps","Subsample emittance"},
-	 {"acut","Amplitude cut"},
-	 {"vol","Fractional emittance"},
-	 {"mode","Most probable amplitude"},
-	 {"quan","Amplitude quantile"}};
-  std::map<std::string, std::string> par_names =
-	{{"eps","Emittance"}, {"subeps","Subemittance"}, {"vol","Fractional"}};
-
   // Calculate the LiH parameters in MICE
   double depth = 6.5;		// [cm], thickness of the absorber
-  double density = 0.693;	// [g/cm^3], measured for the whole cylinder
-  double Z = 4;			// 3+1	
-  double A = 7.05274;		// [g/mol], 95.52% of Li6 (7), 4.48% of Li7 (7), natural H (1.00794)
-  double X_0 = 102;	 	// [cm], radiation length
-  double I = 36.5;		// [eV], mean excitation potential
+  double X_0 = 102.04;	 	// [cm], radiation length
   Scattering scat(depth/X_0);
 
-  Material mat;
-  mat.name = "LiH";
-  mat.rho = density;
-  mat.Z = Z; 		
-  mat.A = A; 	
-  mat.I = I;
-  EnergyLoss eloss(mat, 10*depth);
-  std::cerr << eloss.GetMomentumLoss(140, 105.66) << std::endl;
-  std::cerr << eloss.GetMostProbableMomentumLoss(140, 105.66) << std::endl;
+  EnergyLoss eloss(AbsLiH, 10*depth);
 
   // Print the changes as a function of beta for 3 different input emittance
   std::vector<size_t> colors = {kBlack, kRed+2, kGreen+2, kBlue+2, kMagenta+2, kCyan+2, kYellow+2};
@@ -204,16 +444,16 @@ int main(int argc, char ** argv) {
       fbeta[eps]->Draw("");
     fbeta[eps]->Draw("SAME");
 
-    TFile ifile(TString::Format("beta_eps_%dmm.root", (int)eps), "READ");
+/*    TFile ifile(TString::Format("beta_eps_%dmm.root", (int)eps), "READ");
     TGraphErrors* graph = (TGraphErrors*)ifile.Get("");
     graph->SetLineColor(colors[id]);
     graph->SetMarkerStyle(24+id);
     graph->Draw("PE SAME");
-    leg0->AddEntry(graph, TString::Format("#epsilon_{#perp}^{i}  = %d mm", (int)eps), "lep"); 
+    leg0->AddEntry(graph, TString::Format("#epsilon_{#perp}^{i}  = %d mm", (int)eps), "lep"); */
 
     ++id;
   }
-  leg0->Draw("SAME");
+  /*leg0->Draw("SAME");
   canv0->SaveAs("deps_beta_toy.pdf");
   delete canv0;
 
@@ -252,7 +492,7 @@ int main(int argc, char ** argv) {
   }
   leg1->Draw("SAME");
   canv1->SaveAs("deps_trans_toy.pdf");
-  delete canv1;
+  delete canv1;*/
 
   // Initialize the transporter
   Transport transport(4);
@@ -262,9 +502,12 @@ int main(int argc, char ** argv) {
       transport.AddSolenoid((double)globals["toy_sol"]/100, .5);
 
   // Define the input beam. Get the input sample from an external file if specified
+  Generator gen(globals["toy_dim"], globals["toy_mass"]);
+  gen.SetMatrixParametrisation(globals["toy_mom"], globals["toy_eps"],
+				globals["toy_beta"], globals["toy_alpha"]);
   size_t Size = (double)globals["toy_n"];
-  std::map<std::string, std::vector<double>> iSize;
-  size_t ref_id = globals["ref_id"];
+  Beam::BunchMap inBunchMap;
+  size_t ref_id = globals["tku_vid"];
   if ( globals.GetDataFiles().size() ) {
     Pitch::print(Pitch::info, "Importing"+globals.GetDataFiles()[0]);
     TFile data_file(globals.GetDataFiles()[0].c_str());	// Load the MAUS input file
@@ -293,19 +536,18 @@ int main(int argc, char ** argv) {
       mom = TVector3(ntuple[6], ntuple[7], ntuple[8]);
 	
       // Fill the external samples
-      iSize["x"].push_back(pos.x());
-      iSize["y"].push_back(pos.y());
-      iSize["px"].push_back(mom.x());
-      iSize["py"].push_back(mom.y());
-      iSize["pz"].push_back(mom.z());
+      inBunchMap["x"].push_back(pos.x());
+      inBunchMap["y"].push_back(pos.y());
+      inBunchMap["px"].push_back(mom.x());
+      inBunchMap["py"].push_back(mom.y());
+      inBunchMap["pz"].push_back(mom.z());
     }
   } else {
-    iSize = GaussianBunch(globals["toy_mass"], globals["toy_mom"], Size,
-			      globals["toy_eps"], globals["toy_beta"], globals["toy_alpha"]);
+    inBunchMap = gen.GaussianBunchMap(Size);
   }
 
   // Draw the input beam
-  Beam::Bunch inbeam(iSize, 0, "in");
+  Beam::Bunch inbeam(inBunchMap, 0, "in");
   TH2F* hinxpx = inbeam.Histogram("x", "px", -400, 400, -100, 100);
   TEllipse* inxpxell = inbeam.Ellipse("x", "px");
 
@@ -317,12 +559,12 @@ int main(int argc, char ** argv) {
 
   // Define and draw the density estimation of the input beam
   if ( globals["de"] ) {
-    std::vector<std::vector<double>> samples(iSize["x"].size());
+    std::vector<std::vector<double>> samples(inBunchMap["x"].size());
     for (size_t i = 0; i < samples.size(); i++) {
-      samples[i].push_back(iSize["x"][i]);
-      samples[i].push_back(iSize["px"][i]);
-      samples[i].push_back(iSize["y"][i]);
-      samples[i].push_back(iSize["py"][i]);
+      samples[i].push_back(inBunchMap["x"][i]);
+      samples[i].push_back(inBunchMap["px"][i]);
+      samples[i].push_back(inBunchMap["y"][i]);
+      samples[i].push_back(inBunchMap["py"][i]);
     }
 
     DensityEstimator de(samples, "knn", false);  
@@ -341,7 +583,7 @@ int main(int argc, char ** argv) {
   }
 
   // Diffuse and scatter the input beam to create the output beam
-  std::map<std::string, std::vector<double>> outsamples = iSize;
+  Beam::BunchMap outsamples = inBunchMap;
   if ( globals["toy_eloss"] )
       eloss.IonizeBunch(outsamples, globals["toy_mom"], globals["toy_mass"]);
   if ( globals["toy_scat"] )
@@ -398,7 +640,7 @@ int main(int argc, char ** argv) {
   TH1F* heloss = new TH1F("eloss", "Energy loss going through the absorber", 100, 0, 30);
   Vector<double> vin, vout;
   for (size_t i = 0; i < Size; i++) {
-    vin = Vector<double>({iSize["px"][i], iSize["py"][i], iSize["pz"][i]});
+    vin = Vector<double>({inBunchMap["px"][i], inBunchMap["py"][i], inBunchMap["pz"][i]});
     vout = Vector<double>({outsamples["px"][i], outsamples["py"][i], outsamples["pz"][i]});
     heloss->Fill(vin.mag()-vout.mag());
   }
@@ -488,9 +730,11 @@ int main(int argc, char ** argv) {
 
   // Draw the amplitude change distribution
   Vector<double> vamps = Vector<double>(outamps)-Vector<double>(inamps);
+  for (size_t i = 0; i < vamps.size(); i++)
+      vamps[i] = outamps[i]/inamps[i]-1.;
   TH2F* hvamp = new TH2F("vamp",
 	"Transverse amplitude change;A_{#perp}^{U} [mm];A_{#perp}^{D}-A_{#perp}^{U} [mm]",
-	20, 0, 100, 25, -25, 25);
+	20, 0, 100, 25, -.5, .5);
   hvamp->FillN(inamps.size(), &inamps[0], &vamps[0], NULL, 1);
 
   canv = new TCanvas("c", "c", 1200, 800);
@@ -529,7 +773,7 @@ int main(int argc, char ** argv) {
   delete canv;
 
   // Compare the Voronoi cell volumes (TODO TODO TODO)
-  if ( globals["voronoi"] ) {
+/*  if ( globals["voronoi"] ) {
     inbeam.SetVoronoiVolumes();
     Pitch::print(Pitch::info, "Computed upstream Voronoi volumes");
     std::vector<double> invvols = inbeam.VoronoiVolumes();
@@ -596,113 +840,41 @@ int main(int argc, char ** argv) {
   //  foutvvols->Draw("SAME");
     canv->SaveAs("vvol_toy_fitted.pdf");
     delete canv;
-  }
+  }*/
 
+  // Should be moved (TODO TODO TODO TODO)
+  Beam::Bunch tempin, tempout;
+  Beam::Stream stream({{0,inbeam}, {1,outbeam}});
+  double in, out, ine, oute, value, error;
+
+  /////////////////////////////////////////////
+  /////////////// FRACTIONAL //////////////////
+  /////////////////////////////////////////////
   // Plot the fractional quantities as a function of the fraction
   Pitch::print(Pitch::info, "Filling the fractional graphs");
-  Beam::Bunch tempin, tempout;
-  std::map<std::string, TGraphErrors*> fracgraphs;
-  for (const std::string& fracpar : fracpars)
-      fracgraphs[fracpar] = new TGraphErrors();
-
-  double maxfrac(1.), minfrac(.1), fracstep(.05);
-  double tempfrac, in, out, transmission, ine, oute, value, error;
-  ProgressBar pbar;
-  for (tempfrac = minfrac; tempfrac <= maxfrac+0.01; tempfrac += fracstep) {
-
-    transmission = (double)outbeam.Size()/inbeam.Size();
-    if ( transmission < tempfrac )
-	continue;
-
-    inbeam.SetCoreFraction(tempfrac);
-    outbeam.SetCoreFraction(tempfrac/transmission);    
-    for (const std::string& fracpar : fracpars )  {
-      if ( fracpar == "subeps" ) {
-        in = tempin.NormEmittance().GetValue();
-        out = tempout.NormEmittance().GetValue();
-//        in = tempin.Mean("amp").GetValue();
-//        out = tempout.Mean("amp").GetValue();
-        ine = tempin.NormEmittance().GetError();
-        oute = tempout.NormEmittance().GetError();
-      } else if ( fracpar == "acut" ) {
-        in = Math::Max(tempin.Amplitudes());
-        ine = in/sqrt(tempin.Size());
-        out = Math::Max(tempout.Amplitudes());
-        oute = out/sqrt(tempin.Size());
-      } else if ( fracpar == "vol" ) {
-	if ( !globals["de"] ) {
-          in = tempin.FracEmittance().GetValue();
-          out = tempout.FracEmittance().GetValue();
-        } else {
-	  in = inbeam.FracEmittance().GetValue();
-	  out = outbeam.FracEmittance().GetValue();
-        }
-        ine = in/sqrt(tempin.Size());
-        oute = out/sqrt(tempin.Size());
-      } else if ( fracpar == "quan" ) {
-        in = Math::Quantile(inbeam.Amplitudes(), tempfrac);
-        ine = in/sqrt(tempin.Size());
-        out = Math::Quantile(outbeam.Amplitudes(), tempfrac);
-        oute = out/sqrt(tempin.Size());
-      } else {
-	Pitch::print(Pitch::warning, "Fractional quantity not recognized, abort");
-	break;
-      }
-
-      if ( fracpar != "vol" ) {
-        value = 100*(out-in)/in;
-        error = fabs(value)*sqrt(pow(ine/in, 2)+pow(oute/out, 2));
-      } else {
-        value = 100*(sqrt(1.+(out-in)/in)-1.);
-        error = fabs(value)*sqrt(pow(ine/in, 2)+pow(oute/out, 2));
-      }
-      fracgraphs[fracpar]->SetPoint((int)((tempfrac+0.01-minfrac)/fracstep), tempfrac, value);
-      fracgraphs[fracpar]->SetPointError((int)((tempfrac+0.01-minfrac)/fracstep), 0, error);
-    }
-
-    // Display the progress in %
-    pbar.GetProgress((tempfrac+0.01-minfrac)/fracstep-1, (maxfrac+0.01-minfrac)/fracstep);
-  }
-
-  id = 0;
-  TMultiGraph* mgfrac = new TMultiGraph();
-  fracgraphs["acut"]->SetTitle("Amplitude, A_{#alpha}"); 
-  fracgraphs["subeps"]->SetTitle("Subemittance, e_{#alpha}"); 
-  fracgraphs["vol"]->SetTitle("Fractional emittance, #epsilon_{#alpha}"); 
-  TLegend *legfrac = new TLegend(.5, .65, .89, .89);
-  legfrac->SetLineColorAlpha(0, 0);
-  for (const std::string& fracpar : fracpars ) {
-    // Set the graph parameters
-    fracgraphs[fracpar]->GetXaxis()->SetTitle("Fraction #alpha");
-    std::string y_label =
-	"#Delta"+par_labels[fracpar]+"_{#alpha}/"+par_labels[fracpar]+"_{#alpha}^{i} [%]";
-    fracgraphs[fracpar]->GetYaxis()->SetTitle(y_label.c_str());
-    fracgraphs[fracpar]->SetMarkerSize(2);
-    fracgraphs[fracpar]->SetMarkerStyle(24+id);
-    fracgraphs[fracpar]->SetLineColor(colors[id]);
-    fracgraphs[fracpar]->SetLineWidth(3);
-    legfrac->AddEntry(fracgraphs[fracpar], fracgraphs[fracpar]->GetTitle(), "PE");
-    id++;
-
-    mgfrac->Add(fracgraphs[fracpar], "PE");
-  }
+  std::vector<Beam::SumStat> fracpars = {Beam::amp, Beam::subeps, Beam::vol};
+  TMultiGraph* mgfrac = FractionalGraph(stream, fracpars);
 
   TCanvas *canvfrac = new TCanvas("c", "c", 1200, 800);
   mgfrac->Draw("A");
-  mgfrac->SetMinimum(-8);
-  mgfrac->SetMaximum(-3);
+  mgfrac->SetMinimum(-7);
+  mgfrac->SetMaximum(-5);
   mgfrac->SetTitle(";Fraction #alpha;#Delta#epsilon_{#perp}  /#epsilon_{#perp}^{i}  [%]");
+  
+  BuildLegend(mgfrac);
+
   double truechange = fbeta[6]->Eval(globals["toy_beta"]);
-  TLine *ltrue = new TLine(0.06, truechange, 0.99, truechange);
+  TLine *ltrue = new TLine(0.005, truechange, .995, truechange);
   ltrue->Draw("SAME");
-  legfrac->Draw("SAME");
+
   canvfrac->SaveAs("super_frac_toy.pdf");
   delete mgfrac;
   delete canvfrac;
 
   /////////////////////////////////////////////
-  ////////// VARIABLE TRANSMISSION ////////////
+  ////////////// TRANSMISSION /////////////////
   /////////////////////////////////////////////
+  // Plot the fractional quantities as a function of the transmission
   Pitch::print(Pitch::info, "Filling the variable transmission graphs");
   std::map<std::string, TGraphErrors*> transgraphs;
   std::vector<std::string> transpars = {"eps"};  
@@ -722,22 +894,22 @@ int main(int argc, char ** argv) {
 		return a.second < b.second;
 	    });   
 
-  std::map<std::string, std::vector<double>> tempiSize, tempoutsamples;
+  Beam::BunchMap tempinBunchMap, tempoutsamples;
   size_t tempn(0);
   double maxtrans(1.), mintrans(.1), transstep(.05);
   double temptrans;
-  pbar = ProgressBar();
+  ProgressBar pbar = ProgressBar();
   for (temptrans = mintrans; temptrans < maxtrans+0.001; temptrans += transstep) {
     // Truncate the in and out samples according to out order
     for (size_t j = tempn; j < (size_t)(Size*temptrans); j++)
       for (const std::string& var : vars) {
-	tempiSize[var].push_back(iSize[var][outamps_id[j].first]);
+	tempinBunchMap[var].push_back(inBunchMap[var][outamps_id[j].first]);
 	tempoutsamples[var].push_back(outsamples[var][outamps_id[j].first]);
       }
     tempn = Size*temptrans;
 
     // Initialize the observed beams
-    tempin = Beam::Bunch(tempiSize);
+    tempin = Beam::Bunch(tempinBunchMap);
     tempout = Beam::Bunch(tempoutsamples);   
 
     // Compare and fill the beta plots
@@ -776,12 +948,8 @@ int main(int argc, char ** argv) {
 
   for (const std::string& par : transpars ) {
     // Set the graph parameters
-//    transgraphs[par]->SetTitle(std::string(par_titles[par]+" change").c_str());
     transgraphs[par]->SetTitle("");
     transgraphs[par]->GetXaxis()->SetTitle("T [%]");
-    std::string y_label =
-	"#Delta"+par_labels[par]+"_{#alpha}/"+par_labels[par]+"_{#alpha}^{in} [%]";
-    transgraphs[par]->GetYaxis()->SetTitle(y_label.c_str());
     transgraphs[par]->SetMarkerSize(1.5);
     transgraphs[par]->SetMarkerStyle(21);
     transgraphs[par]->SetLineColor(2);
@@ -795,7 +963,6 @@ int main(int argc, char ** argv) {
     gPad->SetGridx();
     gPad->SetGridy();
     transgraphs[par]->Draw("APE");
-//    trans_leg->Draw("SAME");
     canv->SaveAs(std::string(par+"_trans_toy.pdf").c_str());
     delete transgraphs[par];
     delete canv;
@@ -806,259 +973,33 @@ int main(int argc, char ** argv) {
   ///////// VARIABLE BETA FUNCTION ////////////
   /////////////////////////////////////////////
   Pitch::print(Pitch::info, "Filling the variable beta graphs");
-  // Change the beta function and check the change as a function of it
-  std::map<std::string, TGraphErrors*> betagraphs;
-  std::vector<std::string> betapars = {"eps"/*, "subeps", "vol"*/};
-  for (const std::string par : betapars)
-      betagraphs[par] = new TGraphErrors();
-  double maxbeta(1000), minbeta(100), betastep(100);
-  double tempbeta;
-  pbar = ProgressBar();
-  for (tempbeta = minbeta; tempbeta < maxbeta+1; tempbeta += betastep) {
+  std::vector<Beam::SumStat> betapars = {Beam::amp, Beam::subeps/*, Beam::vol*/};
+  TMultiGraph* mgbeta = BetaGraph(stream, betapars);
 
-    // Create a new input beam
-    iSize.clear();
-    iSize = GaussianBunch(globals["toy_mass"], globals["toy_mom"], Size,
-		     	     globals["toy_eps"], tempbeta, globals["toy_alpha"]);
-    Beam::Bunch ibeam(iSize, 0., "in"); 
-
-    // Diffuse and scatter to create the output beam
-    outsamples.clear();
-    outsamples = iSize;
-    if ( globals["toy_scat"] )
-        scat.ScatterBunch(outsamples, globals["toy_mom"], globals["toy_mass"]);
-    if ( globals["toy_eloss"] )
-        eloss.IonizeBunch(outsamples, globals["toy_mom"], globals["toy_mass"]);
-    Beam::Bunch obeam(outsamples, 10*depth, "out");
-
-    transmission = (double)obeam.Size()/ibeam.Size();
-    ibeam.SetCoreFraction(frac);
-    obeam.SetCoreFraction(frac/transmission);   
-
-    // Compare and fill the beta plots
-    for (const std::string& par : betapars )  {
-      if ( par == "eps" ) {
-        in = ibeam.NormEmittance().GetValue();
-        out = obeam.NormEmittance().GetValue();
-      } else if ( par == "subeps" ) {
-        in = tempin.NormEmittance().GetValue();
-        out = tempout.NormEmittance().GetValue();
-//        in = tempin.Mean("amp").GetValue();
-//        out = tempout.Mean("amp").GetValue();
-      } else if ( par == "acut" ) {
-        in = Math::Max(tempin.Amplitudes());
-        out = Math::Max(tempout.Amplitudes());
-      } else if ( par == "vol" ) {
-	if ( !globals["de"] ) {
-          in = tempin.FracEmittance().GetValue();
-          out = tempout.FracEmittance().GetValue();
-        } else {
-	  in = inbeam.FracEmittance().GetValue();
-	  out = outbeam.FracEmittance().GetValue();
-        }
-        ine = in/sqrt(tempin.Size());
-        oute = out/sqrt(tempin.Size());
-      } else if ( par == "quan" ) {
-        in = Math::Quantile(ibeam.Amplitudes(), tempfrac);
-        out = Math::Quantile(obeam.Amplitudes(), tempfrac);
-      } else {
-	Pitch::print(Pitch::warning, "Fractional quantity not recognized, abort");
-	break;
-      }
-      betagraphs[par]->SetPoint((int)((tempbeta+1-minbeta)/betastep), tempbeta, 100*(out-in)/in);
-      betagraphs[par]->SetPointError((int)((tempbeta+1-minbeta)/betastep), 0,
-					100*sqrt((pow(1+(out-in)/in, 2)-0.88*0.88)*2./1e5));
-    }
-
-    // Display the progress in %
-    pbar.GetProgress((tempbeta+1e-3-minbeta)/betastep-1, (maxbeta+1e-3-minbeta)/betastep);
-  }
-
-
-  // Set a legend for the plots as a function of beta perp
-  TLegend *beta_leg = new TLegend(.65, .11, .89, .3);
-  beta_leg->SetLineColorAlpha(0, 0);
-  beta_leg->SetFillColor(0);
-  beta_leg->AddEntry(betagraphs[betapars[0]],
-		     TString::Format("p_{i}: %d MeV/c", (int)globals["toy_mom"]), "");
-  beta_leg->AddEntry(betagraphs[betapars[0]],
-		     TString::Format("#epsilon_{i}: %d mm", (int)globals["toy_eps"]), "");
-
-  for (const std::string& par : betapars ) {
-    // Set the graph parameters
-//    betagraphs[par]->SetTitle(std::string(par_titles[par]+" change").c_str());
-    betagraphs[par]->SetTitle("");
-    betagraphs[par]->GetXaxis()->SetTitle("#beta_{#perp}  [mm]");
-    std::string y_label =
-	"#Delta"+par_labels[par]+"_{#alpha}/"+par_labels[par]+"_{#alpha}^{in} [%]";
-    betagraphs[par]->GetYaxis()->SetTitle(y_label.c_str());
-    betagraphs[par]->SetMarkerStyle(24);
-    betagraphs[par]->SetMarkerSize(1.5);
-    betagraphs[par]->SetLineColor(2);
-    betagraphs[par]->SetLineWidth(3);
-
-    TFile ofile(TString::Format("beta_%s_%dmm.root", par.c_str(), (int)globals["toy_eps"]), "RECREATE");
-    betagraphs[par]->Write();
-    ofile.Close();
-
-    TCanvas *canv = new TCanvas("c", "c", 1200, 800);
-    gPad->SetGridx();
-    gPad->SetGridy();
-    betagraphs[par]->Draw("APE");
-    canv->SaveAs(std::string(par+"_beta_toy.pdf").c_str());
-    delete canv;
-  }
-  delete beta_leg;
-
-  // Make a superimposed plot of all the beta plots
-  TCanvas* c = new TCanvas ("c", "c", 1200, 800);
-  gPad->SetGridx();
-  gPad->SetGridy();
-  TLegend* lbeta = new TLegend(.7, .11, .89, .3);
-  lbeta->SetLineColorAlpha(0, 0);
-  lbeta->SetFillColor(0);
-  size_t gid(1);
-  TMultiGraph* mgbeta = new TMultiGraph();
-  mgbeta->SetTitle(";#beta_{#perp} [mm];#Delta x/x [%]");
-  for (const std::string& par : betapars ) {
-    // Set the graph parameters
-    betagraphs[par]->SetLineColor(gid);
-    betagraphs[par]->SetMarkerStyle(19+gid);
-    betagraphs[par]->GetYaxis()->SetTitle("#Delta x/x [%]");
-    mgbeta->Add(betagraphs[par], "PE");
-    lbeta->AddEntry(betagraphs[par], par_names[par].c_str(), "lp");
-    gid++;
-    if ( gid == 5 ) gid++;
-  }
+  TCanvas *canvbeta = new TCanvas("c", "c", 1200, 800);
   mgbeta->Draw("A");
-  lbeta->Draw("SAME");
-  c->SaveAs("beta_super_toy.pdf");
-  delete c;
-   
+  mgbeta->SetTitle(";#beta_{#perp}  [mm];#Delta#epsilon_{#perp}  /#epsilon_{#perp}^{i}  [%]");
+  
+  BuildLegend(mgbeta);
+
+  canvbeta->SaveAs("beta_super_toy.pdf");
+  delete mgbeta;
+  delete canvbeta;   
 
   /////////////////////////////////////////////
   ///////// VARIABLE INPUT EMITTANCE //////////
   /////////////////////////////////////////////
-  Pitch::print(Pitch::info, "Filling the variable emittance graphs");
-  // Change the beta function and check the change as a function of it
-  std::map<std::string, TGraph*> epsgraphs;
-  std::vector<std::string> epspars = {"eps", "subeps", "vol"};
-  for (const std::string par : epspars)
-      epsgraphs[par] = new TGraph();
-  double maxeps(10), mineps(2), epsstep(1);
-  double tempeps;
-  pbar = ProgressBar();
-  for (tempeps = mineps; tempeps < maxeps+1; tempeps += epsstep) {
+  Pitch::print(Pitch::info, "Filling the variable input emittance graphs");
+  std::vector<Beam::SumStat> epspars = {Beam::amp, Beam::subeps/*, Beam::vol*/};
+  TMultiGraph* mgeps = EmittanceGraph(stream, epspars);
 
-    // Create a new input beam
-    iSize.clear();
-    iSize = GaussianBunch(globals["toy_mass"], globals["toy_mom"], Size,
-			     tempeps, globals["toy_beta"], globals["toy_alpha"]);
-    Beam::Bunch ibeam(iSize, 0., "in");
-
-    // Diffuse and scatter to create the output beam
-    outsamples.clear();
-    outsamples = iSize;
-    if ( globals["toy_scat"] )
-        scat.ScatterBunch(outsamples, globals["toy_mom"], globals["toy_mass"]);
-    if ( globals["toy_eloss"] )
-        eloss.IonizeBunch(outsamples, globals["toy_mom"], globals["toy_mass"]);
-    Beam::Bunch obeam(outsamples, 10*depth, "out");
-
-    transmission = (double)obeam.Size()/ibeam.Size();
-    ibeam.SetCoreFraction(frac);
-    obeam.SetCoreFraction(frac/transmission);   
-
-    // Compare and fill the eps plots
-    for (const std::string& par : epspars )  {
-      if ( par == "eps" ) {
-        in = ibeam.NormEmittance().GetValue();
-        out = obeam.NormEmittance().GetValue();
-      } else if ( par == "subeps" ) {
-        in = tempin.NormEmittance().GetValue();
-        out = tempout.NormEmittance().GetValue();
-//        in = tempin.Mean("amp").GetValue();
-//        out = tempout.Mean("amp").GetValue();
-      } else if ( par == "acut" ) {
-        in = Math::Max(tempin.Amplitudes());
-        out = Math::Max(tempout.Amplitudes());
-      } else if ( par == "vol" ) {
-	if ( !globals["de"] ) {
-          in = tempin.FracEmittance().GetValue();
-          out = tempout.FracEmittance().GetValue();
-        } else {
-	  in = inbeam.FracEmittance().GetValue();
-	  out = outbeam.FracEmittance().GetValue();
-        }
-        ine = in/sqrt(tempin.Size());
-        oute = out/sqrt(tempin.Size());
-      } else if ( par == "quan" ) {
-        in = Math::Quantile(ibeam.Amplitudes(), tempfrac);
-        out = Math::Quantile(obeam.Amplitudes(), tempfrac);
-      } else {
-	Pitch::print(Pitch::warning, "Fractional quantity not recognized, abort");
-	break;
-      }
-      epsgraphs[par]->SetPoint((int)((tempeps+0.01-mineps)/epsstep), tempeps, 100*(out-in)/in);
-    }
-
-    // Display the progress in %
-    pbar.GetProgress((tempeps+1e-3-mineps)/epsstep-1, (maxeps+1e-3-mineps)/epsstep);
-  }
-
-  // Set a legend for the plots as a function of ineps
-  TLegend *eps_leg = new TLegend(.65, .7, .89, .89);
-  eps_leg->SetLineColorAlpha(0, 0);
-  eps_leg->SetFillColor(0);
-  eps_leg->AddEntry(epsgraphs[epspars[0]],
-		     TString::Format("p_{i}: %d MeV/c", (int)globals["toy_mom"]), "");
-  eps_leg->AddEntry(epsgraphs[epspars[0]],
-		     TString::Format("#beta_{#perp}: %d mm", (int)globals["toy_beta"]), "");
-
-  for (const std::string& par : epspars ) {
-    // Set the graph parameters
-    epsgraphs[par]->SetTitle(std::string(par_titles[par]+" change").c_str());
-    epsgraphs[par]->GetXaxis()->SetTitle("#epsilon_{n}^{in} [mm]");
-    std::string y_label =
-	"#Delta"+par_labels[par]+"_{#alpha}/"+par_labels[par]+"_{#alpha}^{in} [%]";
-    epsgraphs[par]->GetYaxis()->SetTitle(y_label.c_str());
-    epsgraphs[par]->SetMarkerStyle(21);
-    epsgraphs[par]->SetLineColor(2);
-    epsgraphs[par]->SetLineWidth(3);
-
-    TCanvas *canv = new TCanvas("c", "c", 1200, 800);
-    gPad->SetGridx();
-    gPad->SetGridy();
-    epsgraphs[par]->Draw("APL");
-    eps_leg->Draw("SAME");
-    canv->SaveAs(std::string(par+"_eps_toy.pdf").c_str());
-    delete canv;
-  }
-  delete eps_leg;
-
-  // Make a superimposed plot of all the eps plots
-  c = new TCanvas ("c", "c", 1200, 800);
-  gPad->SetGridx();
-  gPad->SetGridy();
-  TLegend* leps = new TLegend(.7, .7, .89, .89);
-  leps->SetLineColorAlpha(0, 0);
-  leps->SetFillColor(0);
-  gid = 1;
-  TMultiGraph* mgeps = new TMultiGraph();
-  mgeps->SetTitle(";#epsilon_{n}^{in} [mm];#Delta x/x [%]");
-  for (const std::string& par : epspars ) {
-    // Set the graph parameters
-    epsgraphs[par]->SetLineColor(gid);
-    epsgraphs[par]->SetMarkerStyle(19+gid);
-    epsgraphs[par]->GetYaxis()->SetTitle("#Delta x/x [%]");
-    mgeps->Add(epsgraphs[par], "pl");
-    leps->AddEntry(epsgraphs[par], par_names[par].c_str(), "lp");
-    gid++;
-    if ( gid == 5 ) gid++;
-  }
+  TCanvas *canveps = new TCanvas("c", "c", 1200, 800);
   mgeps->Draw("A");
-  leps->Draw("SAME");
-  c->SaveAs("eps_super_toy.pdf");
-  delete c;
+  mgeps->SetTitle(";#epsilon_{#perp}  [mm];#Delta#epsilon_{#perp}  /#epsilon_{#perp}^{i}  [%]");
+  
+  BuildLegend(mgeps);
 
+  canveps->SaveAs("eps_super_toy.pdf");
+  delete mgeps;
+  delete canveps;  
 }

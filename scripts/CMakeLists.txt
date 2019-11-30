@@ -8,21 +8,39 @@ message(STATUS						"${SOURCE_FILES}")
 
 # Add executables
 if (MAUS_FOUND)
-  add_executable(		import_data		ImportMAUSData.cc)
-  target_link_libraries(	import_data		Synapse
+  add_executable(		import_mice		ImportMice.cc)
+  target_link_libraries(	import_mice		Synapse
 							${ROOT_LIBRARIES}
-							-lSpectrum
         	                              		${MAUS_LIBRARIES})
-
-  add_executable(		import_sim		ImportMAUSSimulation.cc)
-  target_link_libraries(	import_sim		Synapse
-							${ROOT_LIBRARIES}
-                                      			${MAUS_LIBRARIES})
 
   add_executable(		import_minimal		ImportMAUSMinimal.cc)
   target_link_libraries(	import_minimal		Synapse
 							${ROOT_LIBRARIES}
                                       			${MAUS_LIBRARIES})
+
+  add_executable(		calibrate		Calibrate.cc)
+  target_link_libraries(	calibrate		Synapse
+							${ROOT_LIBRARIES})
+
+  add_executable(		resol			Resolution.cc)
+  target_link_libraries(	resol			Synapse
+							${ROOT_LIBRARIES}
+							-lSpectrum)
+
+  add_executable(		transfer		TransferMatrix.cc)
+  target_link_libraries(	transfer		Synapse
+							${ROOT_LIBRARIES}
+							-lSpectrum)
+
+  add_executable(		apply_cuts		ApplyCuts.cc)
+  target_link_libraries(	apply_cuts		Synapse
+							${ROOT_LIBRARIES}
+							-lSpectrum)
+
+  add_executable(		fit_debug		CombinedFitDebug.cc)
+  target_link_libraries(	fit_debug		Synapse
+							${ROOT_LIBRARIES}
+							-lSpectrum)
 
   add_executable(		convert_to_json		ConvertToJson.cc)
   target_link_libraries(	convert_to_json		Synapse
@@ -51,8 +69,8 @@ target_link_libraries(		reweight		Synapse
 							qhull_r
 							qhullcpp)
 
-add_executable(			syst			SystematicCorrections.cc)
-target_link_libraries(		syst			Synapse
+add_executable(			amplitudes		Amplitudes.cc)
+target_link_libraries(		amplitudes		Synapse
 							${ROOT_LIBRARIES}
 							-lSpectrum
 							-lMinuit
@@ -60,8 +78,26 @@ target_link_libraries(		syst			Synapse
 							qhull_r
 							qhullcpp)
 
-add_executable(			amplitudes		Amplitudes.cc)
-target_link_libraries(		amplitudes		Synapse
+add_executable(			syst_amp		SystematicAmplitudes.cc)
+target_link_libraries(		syst_amp		Synapse
+							${ROOT_LIBRARIES}
+							-lSpectrum
+							-lMinuit
+							-lGeom
+							qhull_r
+							qhullcpp)
+
+add_executable(			syst_ps			SystematicPhaseSpace.cc)
+target_link_libraries(		syst_ps			Synapse
+							${ROOT_LIBRARIES}
+							-lSpectrum
+							-lMinuit
+							-lGeom
+							qhull_r
+							qhullcpp)
+
+add_executable(			syst_density		SystematicDensity.cc)
+target_link_libraries(		syst_density		Synapse
 							${ROOT_LIBRARIES}
 							-lSpectrum
 							-lMinuit

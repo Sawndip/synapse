@@ -75,8 +75,9 @@ int main(int argc, char ** argv) {
   }
 
   // Initialize the geometry handler with the relevant detectors
-  std::vector<std::string> dets = {"tku", "tkd"};
+  std::vector<std::string> dets = {"tof0", "tof1", "tku", "tkd"};
   GeometryHandler geoh(globals["geometry_filename"], dets);
+  double dz_01 = 1e-3*(geoh["tof1"].z() - geoh["tof0"].z());
 
   // Set up and draw the apertures according to the requested model
   Beam::Aperture apertures;
@@ -206,6 +207,8 @@ int main(int argc, char ** argv) {
   TNtuple* data_samples = new TNtuple("data_ntuple", "",
 	"SpillID:EventID:TrackerID:StationID:x:y:z:px:py:pz:ex:ey:ez:epx:epy:epz");
 
+  std::vector<double> tof01, tkup, ploss;
+
   for (const std::string& file : globals.GetDataFiles()) {
     // Set up the ROOT file
     TFile data_file(file.c_str());		// Load the MAUS output file
@@ -262,7 +265,8 @@ int main(int argc, char ** argv) {
       if ( globals["fit_pid"] ) {
         std::vector<std::string> data_files;
         data_files.push_back(file);
-        particle_id = ParticleIdentification(data_files, {0, 1});
+//        particle_id = ParticleIdentification(data_files, {0, 1});
+        particle_id = ParticleIdentification(data_files, {0, 1}, globals["tofmin"], globals["tofmax"]);
       } else {
         particle_id = ParticleIdentification({0, 1}, globals["tofmin"], globals["tofmax"]);
       }
@@ -271,7 +275,7 @@ int main(int argc, char ** argv) {
     // Loop over the spills, get the recon events
     double tkfid = (double)globals["tracker_fiducial"];
     ProgressBar pbar;
-    for (size_t i = 0; i < (size_t)T->GetEntries(); ++i) {
+    for (size_t i = 0; i < 1000/*(size_t)T->GetEntries()*/; ++i) {
 
       // Display the progress in %
       pbar.GetProgress(i, (size_t)T->GetEntries());
@@ -723,12 +727,30 @@ int main(int argc, char ** argv) {
 	    }
 	  }
 
+	  double ptof = 105.66/sqrt(pow(t01*1e-9*299792458./dz_01, 2)-1);
+          double ptku = sqrt(pow(vpoint["tku"][0]["px"], 2)+
+			      pow(vpoint["tku"][0]["py"], 2)+
+			      pow(vpoint["tku"][0]["pz"], 2));
+	  tof01.push_back(t01);
+	  tkup.push_back(ptku);
+	  ploss.push_back(ptku-ptof);
+
         } // End of the list of recEvents
       }
 
     } // End of the list of TTree entries
     data_file.Close();
   } // End of the list of files
+
+  TCanvas* ct = new TCanvas("c", "c", 1200, 800);
+//  TH2F* htest = new TH2F("test", "", 100, 25, 40, 100, 100, 200);
+//  htest->FillN(tof01.size(), &tof01[0], &tkup[0], NULL, 1);
+//  htest->Draw("COLZ");
+  TH1F* hloss = new TH1F("loss", "", 100, -50, 25);
+  hloss->FillN(ploss.size(), &ploss[0], NULL);
+  hloss->Draw();
+  ct->SaveAs("eloss.pdf");
+  delete ct;
 
   // Fill the output file with the Ntuples and information about the sample
   out->cd();
@@ -759,25 +781,25 @@ int main(int argc, char ** argv) {
     fcounters.open("diag_counters.txt");
     for (const std::string type : types) {
       fcounters << type_names[type] << "\n";
-      fcounters << "Event\t" << counters[type]["evt"] << "\n";
-      fcounters << "TOF0 SP\t" << counters[type]["tof0"] << "\n";
-      fcounters << "TOF1 SP\t" << counters[type]["tof1"] << "\n";
-      fcounters << "Both TOFs\t" << counters[type]["none"] << "\n";
-      fcounters << "Muon\t" << counters[type]["pid"] << "\n";
+      fcounters << std::left << std::setw(20) << "Event" << counters[type]["evt"] << "\n";
+      fcounters << std::left << std::setw(20) << "TOF0 SP" << counters[type]["tof0"] << "\n";
+      fcounters << std::left << std::setw(20) << "TOF1 SP" << counters[type]["tof1"] << "\n";
+      fcounters << std::left << std::setw(20) << "Both TOFs" << counters[type]["none"] << "\n";
+      fcounters << std::left << std::setw(20) << "Muon" << counters[type]["pid"] << "\n";
       fcounters << "\n";
-      fcounters << "TKU Event\t" << counters[type]["tkuevt"] << "\n";
-      fcounters << "TKU Reference\t" << counters[type]["ref"] << "\n";
-      fcounters << "TKU Quality\t" << counters[type]["qual"] << "\n";
-      fcounters << "TKU Fiducial\t" << counters[type]["fid"] << "\n";
-      fcounters << "TKU Momentum\t" << counters[type]["mom"] << "\n";
-      fcounters << "TKU All\t" << counters[type]["all"] << "\n";
+      fcounters << std::left << std::setw(20) << "TKU Event" << counters[type]["tkuevt"] << "\n";
+      fcounters << std::left << std::setw(20) << "TKU Reference" << counters[type]["ref"] << "\n";
+      fcounters << std::left << std::setw(20) << "TKU Quality" << counters[type]["qual"] << "\n";
+      fcounters << std::left << std::setw(20) << "TKU Fiducial" << counters[type]["fid"] << "\n";
+      fcounters << std::left << std::setw(20) << "TKU Momentum" << counters[type]["mom"] << "\n";
+      fcounters << std::left << std::setw(20) << "TKU All" << counters[type]["all"] << "\n";
       fcounters << "\n";
-      fcounters << "TKD Event\t" << counters[type]["tkdevt"] << "\n";
-      fcounters << "TKD Reference\t" << counters[type]["tkdref"] << "\n";
-      fcounters << "TKD Quality\t" << counters[type]["tkdqual"] << "\n";
-      fcounters << "TKD Fiducial\t" << counters[type]["tkdfid"] << "\n";
-      fcounters << "TKD Momentum\t" << counters[type]["tkdmom"] << "\n";
-      fcounters << "TKD All\t" << counters[type]["tkdall"] << "\n";
+      fcounters << std::left << std::setw(20) << "TKD Event" << counters[type]["tkdevt"] << "\n";
+      fcounters << std::left << std::setw(20) << "TKD Reference" << counters[type]["tkdref"] << "\n";
+      fcounters << std::left << std::setw(20) << "TKD Quality" << counters[type]["tkdqual"] << "\n";
+      fcounters << std::left << std::setw(20) << "TKD Fiducial" << counters[type]["tkdfid"] << "\n";
+      fcounters << std::left << std::setw(20) << "TKD Momentum" << counters[type]["tkdmom"] << "\n";
+      fcounters << std::left << std::setw(20) << "TKD All" << counters[type]["tkdall"] << "\n";
       fcounters << "\n";
     }
     fcounters.close();

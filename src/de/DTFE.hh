@@ -12,17 +12,9 @@
 #include "TPolyLine.h"
 
 // QHULL includes
-#include "PointCoordinates.h"
-#include "RboxPoints.h"
-#include "QhullError.h"
 #include "Qhull.h"
-#include "QhullQh.h"
-#include "QhullFacet.h"
 #include "QhullFacetList.h"
 #include "QhullFacetSet.h"
-#include "QhullLinkedList.h"
-#include "QhullVertex.h"
-#include "QhullSet.h"
 #include "QhullVertexSet.h"
 
 // Additional includes

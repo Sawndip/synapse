@@ -10,7 +10,7 @@ Pitch* Pitch::instance        = NULL;
 
 const Pitch::errorLevel Pitch::default_error_level = Pitch::warning;
 const int Pitch::default_log_level = 0;
-std::string Pitch::logname = "emittance.log";
+std::string Pitch::logname = "synapse.log";
 
 std::map<Pitch::errorLevel, std::ostream*> Pitch::output;
 
@@ -55,7 +55,7 @@ Pitch * Pitch::getInstance() {
 void Pitch::setOutputs(int verboseLevel, int logLevel) {
   getInstance();
   setLog(logLevel);
-  std::ostream* out[5] = {stdout, stdlog, stderr, stderr, stderr};
+  std::ostream* out[5] = {stdout, stdout, stderr, stderr, stderr};
   for (int i = 0; i <= fatal; ++i) {
     if (i >= verboseLevel)
       output[Pitch::errorLevel(i)] = out[i];

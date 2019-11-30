@@ -1,3 +1,6 @@
+#ifndef SCATTERING_HH
+#define SCATTERING_HH
+
 // C++ includes
 #include <iostream>
 #include <ctime>
@@ -54,8 +57,8 @@ class Scattering {
    *  @param	m	Particle mass [MeV/c^2]
    */
   void ScatterBunch(std::map<std::string, std::vector<double>>& beam,
-		   const double& p,
-		   const double& m);
+		    const double& p,
+		    const double& m);
 
   /** @brief Sets the seed */
   void SetSeed(const size_t& seed)		{ _rdmzer = TRandom3(seed); }
@@ -81,3 +84,5 @@ class Scattering {
   double 	_thickness;	///< Thickness of the material in amount of \f$X_0\f$
   double 	_factor;	///< Prefactor of the scattering formul
 };
+
+#endif

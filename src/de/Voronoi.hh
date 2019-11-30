@@ -17,18 +17,8 @@
 #include "TCanvas.h"
 
 // QHULL includes
-#include "PointCoordinates.h"
-#include "RboxPoints.h"
-#include "QhullError.h"
 #include "Qhull.h"
-#include "QhullQh.h"
-#include "QhullFacet.h"
-#include "QhullFacetList.h"
 #include "QhullFacetSet.h"
-#include "QhullLinkedList.h"
-#include "QhullVertex.h"
-#include "QhullSet.h"
-#include "QhullVertexSet.h"
 
 // NanoFLANN includes
 #include <nanoflann.hpp>
@@ -136,7 +126,7 @@ class Voronoi {
  private:
 
   size_t 				_dim;		///< Dimension of the space
-  std::vector<std::vector<double>>	_points;	///< Vector of N points 
+  std::vector<std::vector<double>>	_points;	///< Vector of N points
   std::vector<Hull>			_cells;		///< Voronoi cells (subhulls)
   bool					_bounded;	///< Switch to bound the points
   std::vector<double>			_lower;		///< Lower bounds in each dimension

@@ -1,7 +1,7 @@
 #include "DensityEstimator.hh"
 
 DensityEstimator::DensityEstimator() :
-  _dim(), _name("de"), _algo(""), _points(), _ob(), _knn(),
+  _dim(), _name("de"), _algo(""), _points(), _levs(), _ob(), _knn(),
   _lrd(), _tde(), _pbatde(), _prob(), _ex(false), _norm(1.) {
 }
 
@@ -9,7 +9,7 @@ DensityEstimator::DensityEstimator(const std::vector<std::vector<double>>& point
 			   	   const std::string algo,
 			   	   const bool ex,
 			   	   const double norm) :
-  _dim(), _name("de"), _algo(algo), _points(points), _ob(), _knn(),
+  _dim(), _name("de"), _algo(algo), _points(points), _levs(), _ob(), _knn(),
   _lrd(), _tde(), _pbatde(), _prob(), _ex(ex), _norm(norm) {
 
   try {
@@ -34,6 +34,7 @@ DensityEstimator& DensityEstimator::operator=(const DensityEstimator& de) {
   _name = de._name;
   _algo = de._algo;
   _points = de._points;
+  _levs = de._levs;
   _ob = de._ob;
   _knn = de._knn;
   _lrd = de._lrd;
@@ -159,6 +160,25 @@ double DensityEstimator::Evaluate(const double* v) const {
   return Evaluate(vv);
 }
 
+void DensityEstimator::SetDensityLevels() {
+  
+  try {
+    // If the levels are already set, return
+    if ( _levs.size() == _points.size() )
+	return;
+
+    // Find the density levels of the particles
+    _levs.resize(_points.size());
+    for (size_t i = 0; i < _levs.size(); i++)
+	_levs[i] = Evaluate(_points[i]);
+
+  } catch ( Exceptions::Exception& e ) {
+    throw(Exceptions::Exception(Exceptions::nonRecoverable,
+	  "Could not set"+std::string(e.what()),
+	  "DensityEstimator::SetDensityLevels"));
+  }
+}
+
 double DensityEstimator::ContourVolume(double alpha,
 				       const std::string method,
 				       const bool draw,
@@ -199,9 +219,10 @@ double DensityEstimator::ContourVolume(double alpha,
     if ( !_prob.IsInitialized() ) {
 
       // Evaluate at the input points if not already done
+      SetDensityLevels();
       size_t i;
       for (i = 0; i < _points.size(); i++)
-	  points.push_back(Vertex(_points[i], Evaluate(_points[i])));
+	  points.push_back(Vertex(_points[i], _levs[i]));
 
       // Sort the points by increasing density, select a fraction alpha of the points
       std::sort(points.begin(), points.end(), [] (const Vertex& a, const Vertex& b)
@@ -286,13 +307,12 @@ double DensityEstimator::ContourVolumeError() {
   if ( _prob.IsInitialized() ) {
     try {
       // Compute the statistical uncertainty inherent to the density estimator
-//      double alpha = _prob.GetAlpha()/_norm;
-//      double serror = sqrt((1.-alpha)/(alpha*_prob.GetVertexArray().size()))
-//				*exp(TMath::ChisquareQuantile(alpha, _dim)/4)*_prob.GetVolume();
-//      double serror = 0.; // TODO TODO 
+      // TODO, currently a fit to the observed uncertainty in Gaussian densities
+      double alpha = _prob.GetAlpha();
+      double serror = pow(4./(alpha*(1.-alpha)), .25)*_prob.GetVolume()/sqrt(_points.size()); 
 
       // Add the uncertainty inherent to the volume reconstruction
-      return /*serror+*/_prob.GetContourVolumeError();
+      return sqrt(pow(serror, 2)+pow(_prob.GetContourVolumeError(), 2));
     } catch ( Exceptions::Exception& e ) {
       throw(Exceptions::Exception(Exceptions::nonRecoverable,
 	    "Could not compute the uncertainty on the contour volume"+std::string(e.what()),
@@ -379,7 +399,6 @@ TGraph* DensityEstimator::Graph(double xmin, double xmax, size_t idx, std::vecto
   // For a certain amount of points, initialize a TGraph
   const size_t npoints = 100;
   TGraph *graph = new TGraph(npoints);
-  graph->SetTitle("Density estimation");
   graph->GetXaxis()->SetTitle(TString::Format("x_{%d}", (int)idx));
 
   // Fill a TGraph with the estimator values
@@ -410,7 +429,7 @@ TH2F* DensityEstimator::Graph2D(double xmin, double xmax, double ymin, double ym
   // For a certain amount of points, compute the estimator and fill a TH2F
   const size_t npoints = 100;
   TH2F *graph = new TH2F(TString::Format("%s_%d%d", _name.c_str(), (int)idx, (int)idy),
-			 "Density estimation", npoints, xmin,
+			 "", npoints, xmin,
 			 xmax, npoints, ymin, ymax);
   graph->GetXaxis()->SetTitle(TString::Format("x_{%d}", (int)idx));
   graph->GetYaxis()->SetTitle(TString::Format("x_{%d}", (int)idy));

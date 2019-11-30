@@ -20,9 +20,36 @@
 
 // Additional modules
 #include "Globals.hh"
-#include "ToyTools.hh"
+#include "Generator.hh"
 #include "Bunch.hh"
 #include "ScatterGraph.hh"
+
+/** @brief Computes the amplitudes of particles in the metric defined by covmat
+ *
+ *  @param	beam		Particle beam object
+ *  @param	covmat		Custom metric
+ *
+ *  @return			Vector of amplitudes
+ */
+std::vector<double> CustomAmplitudes(const Beam::Bunch& beam,
+				     const Matrix<double>& covmat) {
+
+  std::vector<double> amps(beam.Size());
+  double eps = beam.NormEmittance().GetValue();
+  Matrix<double> invcovmat = covmat.Inverse();
+  eps = pow(covmat.Determinant(), .25)/105.66;
+  Matrix<double> x(4, 1), xt(1, 4);
+  for (size_t i = 0; i < amps.size(); i++) {
+    x[0][0] = beam.Samples("px")[i];
+    x[1][0] = beam.Samples("py")[i];
+    x[2][0] = beam.Samples("x")[i];
+    x[3][0] = beam.Samples("y")[i];
+    xt = x.Transpose();
+    amps[i] = eps*(xt*invcovmat*x)[0][0];
+  }
+
+  return amps;
+}
 
 std::map<std::string, ScatterGraph*> ScatterSections(const std::string& type,
 						     Beam::Bunch& beam) {
@@ -74,10 +101,16 @@ int main(int argc, char ** argv) {
   ////////////////////////////////////////////
   ////////// INPUT DISTRIBUTIONS /////////////
   ////////////////////////////////////////////
-  // Realistic gaussian beam
-  std::map<std::string, std::vector<double>> samples =
-	GaussianBunch(globals["toy_mass"], globals["toy_mom"], nsamples,
-		     globals["toy_eps"], globals["toy_beta"], globals["toy_alpha"]);
+  // Realistic gaussian muon beam
+  Generator gen(4, globals["toy_mass"]);
+  gen.SetMatrixParametrisation(140, 3, 150, 0);
+  gen.GetCovarianceMatrix().Print();
+
+  gen.SetMatrixParametrisation(globals["toy_mom"], globals["toy_eps"],
+				globals["toy_beta"], globals["toy_alpha"]);
+//  Beam::Bunch inbeam = gen.GaussianBunch(globals["toy_n"]);
+  Beam::Bunch inbeam = gen.SpiralBunch(globals["toy_n"], 20e-6);
+  
   std::map<std::string, std::vector<double>> cutsamples;
 
   // Propagate through an aberrant lens
@@ -89,8 +122,8 @@ int main(int argc, char ** argv) {
       }
 */
 
-      samples["px"][i] -= samples["x"][i]*(1-1.5e-4*pow(samples["x"][i], 2))/4.;
-      samples["py"][i] -= samples["y"][i]*(1-1.5e-4*pow(samples["y"][i], 2))/4.;
+//      samples["px"][i] -= samples["x"][i]*(1-1.5e-4*pow(samples["x"][i], 2))/4.;
+//      samples["py"][i] -= samples["y"][i]*(1-1.5e-4*pow(samples["y"][i], 2))/4.;
 
 
 /*      if ( pow(samples["x"][i], 2) + pow(samples["y"][i], 2) > 150*150 ) {
@@ -101,17 +134,20 @@ int main(int argc, char ** argv) {
 */
   }
 
-  Beam::Bunch inbeam(samples, 0, "intest");
+  // Apply an aperture
+//  Beam::Bunch inbeam(samples, 0, "intest");
   for (size_t i = 0; i < nsamples; i++) {
-      if ( inbeam.Radius(i) < 150  ) {
+//      if ( inbeam.Radius(i) < 150  ) {
         for (const std::string& var : {"x", "y", "px", "py", "pz"} )
-	     cutsamples[var].push_back(samples[var][i]);
-      }
+	     cutsamples[var].push_back(inbeam.Samples(var)[i]);
+//      }
   }
 
 
   // Initialize the beam object
   Beam::Bunch beam(cutsamples, 0, "test");
+  beam.SetCorrectedAmplitudes();
+  beam.SetCoreFraction(0.25);
 //  Bunch beam90 = beam.Fraction(.9);
 //  Bunch beam80 = beam.Fraction(.8);
 
@@ -123,17 +159,45 @@ int main(int argc, char ** argv) {
   ///// DISTRIBUTION PROFILE AND ELLIPSES ////
   ////////////////////////////////////////////
   // Draw a TH2F and the relevant matrices on top of it
-  TH2F* hxpx = beam.Histogram("x", "px", -300, 300, -199.99, 199.99);
+  TH2F* hxpx = beam.Histogram("x", "px", -200, 200, -99.99, 99.99);
   hxpx->GetXaxis()->SetTitleOffset(0.9);
   hxpx->GetYaxis()->SetTitleOffset(0.9);
   TCanvas* cell = new TCanvas("c", "c", 1200, 800);
   hxpx->SetTitle("");
   hxpx->Draw("");
+
   beam.Ellipse("x", "px")->Draw("SAME");
+
 //  beam90.Ellipse("x", "px")->Draw("SAME");
 //  beam80.Ellipse("x", "px")->Draw("SAME");
-  beam.RobustEllipse("x", "py")->Draw("SAME");
+
+  Matrix<double> truemat(4, 4);
+  std::map<size_t, size_t> mapping = {{0,1},{1,3},{2,0},{3,2}};
+  for (size_t i = 0; i < 4; i++)
+    for (size_t j = 0; j < 4; j++)
+        truemat[i][j] = gen.GetCovarianceMatrix()[mapping[i]][mapping[j]];
+  DGaus true_dist({0, 0, 0, 0}, gen.GetCovarianceMatrix());
+  TEllipse *true_ellipse = (TEllipse*)true_dist.Contour2D(0.09)[0];
+  true_ellipse->SetLineColor(kGreen+2);
+  true_ellipse->Draw("SAME");
+
+  TEllipse *robust_ellipse = beam.RobustEllipse("x", "py");
+  robust_ellipse->SetLineColor(kRed);
+  robust_ellipse->Draw("SAME");
+
+  Matrix<double> coremat = beam.CoreCovarianceMatrix();
+  Matrix<double> corematxpx(2, 2);
+  corematxpx[0][0] = coremat[2][2];
+  corematxpx[0][1] = coremat[2][0];
+  corematxpx[1][0] = coremat[0][2];
+  corematxpx[1][1] = coremat[0][0];
+  DGaus core_dist({0, 0}, corematxpx);
+  TEllipse *core_ellipse = (TEllipse*)core_dist.Contour2D(0.09)[0];
+  core_ellipse->SetLineColor(kBlue+2);
+  core_ellipse->Draw("SAME");
+
   teps->Draw("SAME");
+
   cell->SaveAs("amp_xpx_ellipses.pdf");
   
 
@@ -144,7 +208,8 @@ int main(int argc, char ** argv) {
   std::map<std::string, std::vector<double>> amps;
   std::map<std::string, std::map<std::string, ScatterGraph*>> scat;
   std::vector<std::string> types;
-  amps["regular"] = beam.Amplitudes();
+//  amps["regular"] = beam.Amplitudes();
+  amps["regular"] = CustomAmplitudes(beam, truemat);
   scat["regular"] = ScatterSections("regular", beam);
   types.push_back("regular");
   if ( globals["corrected"] ) {
@@ -155,15 +220,10 @@ int main(int argc, char ** argv) {
   }
   if ( globals["mcd"] ) {
     beam.SetMCDAmplitudes();
-    amps["mcd"] = beam.Amplitudes();
+//    amps["mcd"] = beam.Amplitudes();
+    amps["mcd"] = CustomAmplitudes(beam, beam.CoreCovarianceMatrix());
     scat["mcd"] = ScatterSections("mcd", beam);
     types.push_back("mcd");
-  }
-  if ( globals["generalised"] ) {
-    beam.SetGeneralisedAmplitudes();
-    amps["generalised"] = beam.Amplitudes();
-    scat["generalised"] = ScatterSections("generalised", beam);
-    types.push_back("generalised");
   }
 
   /*TH1F* histr = new TH1F("ampr", "", nbins, minamp, maxamp);

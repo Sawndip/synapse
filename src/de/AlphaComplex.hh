@@ -3,10 +3,7 @@
 
 // C++ includes
 #include <iostream>
-#include <ctime>
-#include <cmath>
 #include <vector>
-#include <map>
 
 // ROOT includes
 #include "TPolyLine.h"
@@ -19,31 +16,20 @@
 #include "TView.h"
 #include "TCanvas.h"
 #include "TPolyMarker3D.h"
-#include "TGLViewer.h"
 
 // QHULL includes
-#include "PointCoordinates.h"
-#include "RboxPoints.h"
-#include "QhullError.h"
 #include "Qhull.h"
-#include "QhullQh.h"
-#include "QhullFacet.h"
-#include "QhullFacetList.h"
-#include "QhullFacetSet.h"
-#include "QhullLinkedList.h"
-#include "QhullVertex.h"
-#include "QhullSet.h"
 #include "QhullVertexSet.h"
+#include "QhullFacetList.h"
 
 // Additional includes
-#include "Matrix.hh"
 #include "Vector.hh"
-#include "Statistics.hh"
+#include "Matrix.hh"
 #include "Geometry.hh"
 
 /** @brief Computes the &alpha;-complex of a set of points
  *
- *	   An alpha-complex is the most general definition of a concave hull. The parameter alpha
+ *	   An &alpha;-complex is the most general definition of a concave hull. The parameter alpha
  *	   defines the curvature of the circumcircle that limits the maximum distance between
  *	   two points on the hull.
  */
@@ -61,38 +47,36 @@ class AlphaComplex {
 	       const double alpha=0.);
 
   /** @brief Copy constructor */
-  AlphaComplex(const AlphaComplex& del);
+  AlphaComplex(const AlphaComplex& alc);
 
   /** @brief Equality operator */
-  AlphaComplex& operator=(const AlphaComplex& del);
+  AlphaComplex& operator=(const AlphaComplex& alc);
 
   /** @brief Destructor */
   ~AlphaComplex();
 
-  /** @brief Find the alpha-complex triangulation of the N points
-   *  @return		True if successful
-   */
+  /** @brief Find the &alpha;-complex triangulation of the N points */
   void Initialize();
 
   /** @brief Returns the dimension of the space in which the tesselation is constructed */
   const size_t& GetDimension() const				{ return _dim; }
 
-  /** @brief Returns the array of points on which the alpha-complex is constructed */
+  /** @brief Returns the array of points on which the &alpha;-complex is constructed */
   const std::vector<std::vector<double>>& GetPointArray() const	{ return _points; }
 
   /** @brief Returns a specific point */
   const std::vector<double>& GetPoint(const size_t i) const	{ return _points[i]; }
 
-  /** @brief Returns the volume of the alpha-complex */
+  /** @brief Returns the volume of the &alpha;-complex */
   const double& GetVolume() const				{ return _vol; }
 
-  /** @brief Returns the volume of the alpha-complex */
+  /** @brief Returns the list of volumes of the cells in the &alpha;-complex */
   const std::vector<double>& GetCellVolumeArray() const		{ return _areas; }
 
-  /** @brief Returns the volume of the alpha-complex */
+  /** @brief Sets the curvature of the maximum circucircle radius; &alpha;=1/R */
   void SetAlpha(const double alpha);
 
-  /** @brief Returns an array of polygons to be drawn in ROOT (only 2D) 
+  /** @brief Returns an array of polygons to be drawn in ROOT (only 2D)
    *
    *  @param	fill	Fills the cells and remove edges if requested
    *
@@ -106,7 +90,7 @@ class AlphaComplex {
    */
   TGeoVolume* Polyhedra() const;
 
-  /** @brief Draw the alpha-complex with the requested properties 
+  /** @brief Draw the &alpha;-complex with the requested properties
    *
    *  @param	fill	Fills the cells and remove edges if requested
    *  @param	points	Draws the points if requested
@@ -114,7 +98,7 @@ class AlphaComplex {
   void Draw(const bool fill=false,
 	    const bool points=false) const;
 
-  /** @brief Paints the alpha-complex onto a TCanvas and save it
+  /** @brief Paints the &alpha;-complex onto a TCanvas and save it
    *
    *  @param	name	Name of the canvas
    *  @param	fill	Fills the cells and remove edges if requested
@@ -141,7 +125,7 @@ class AlphaComplex {
    */
   TGeoVolume* Polyhedron(const std::vector<std::vector<double>>& facet,
 			 TGeoHMatrix*& H) const;
-  
+
   size_t 					_dim;		///< Dimension of the space
   double					_alpha;		///< Curvature alpha
   std::vector<std::vector<double>>		_points;	///< Vector of N vertices

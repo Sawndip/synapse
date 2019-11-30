@@ -76,10 +76,9 @@ void ScatterGraph::AddPoint(double x, double y, double w) {
 
 void ScatterGraph::SetPoints(size_t n, double* x, double* y, double* w) {
 
-  size_t N = GetN();
   size_t i;
   for (i = 0; i < n; i++)
-      _graph->SetPoint(N+i, x[i], y[i], w[i]);
+      _graph->SetPoint(i, x[i], y[i], w[i]);
 }
 
 void ScatterGraph::SetRange(double minx, double miny, double maxx, double maxy) {
@@ -124,13 +123,10 @@ void ScatterGraph::SetMaxSize(const size_t& size) {
 
 void ScatterGraph::Draw() {
 
-  // Set the color palette
-  gStyle->SetPalette(1);
-
   // Draw the graph, set top view
   _graph->Draw("PCOLZ");
   _graph->SetMarkerStyle(20);
-  _graph->SetMarkerSize(1);
+  _graph->SetMarkerSize(0.6);
   _graph->GetZaxis()->SetLabelFont(42);
   _graph->GetZaxis()->SetTitleFont(42);
   gPad->SetTheta(90);

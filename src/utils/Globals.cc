@@ -15,6 +15,7 @@ Globals::Globals(int argc,
     LoadFile("../ConfigurationDefaults.txt");
     LoadCommandLine(argc, argv);
     LoadGeometry();
+    SetVerbosity();
     SetDefaultStyle();
 
     Pitch::print(Pitch::debug, "", "Globals::Initialize");
@@ -50,16 +51,37 @@ const Global& Globals::operator[](const std::string& var) const {
   return _globals.at(var);
 }
 
+void Globals::CheckDataFiles(const std::string& type) const {
+
+  if ( !GetDataFiles().size() ) {
+    throw(Exceptions::Exception(Exceptions::nonRecoverable,
+	  "No data file provided, please execute in the following fashion:\n\n"
+    	  "\t./script [options] file0."+type+" [... fileN."+type+"]\n",
+	  "Globals::CheckDataFiles"));
+  } else {
+    for (const std::string& file : GetDataFiles()) {
+      if ( std::string(file).find(type) > std::string(file).size() )
+          throw(Exceptions::Exception(Exceptions::nonRecoverable,
+	    "Wrong data file format provided, please use "+type+" files",
+	    "Globals::CheckDataFiles"));
+      if ( !std::ifstream(file).good() )
+          throw(Exceptions::Exception(Exceptions::nonRecoverable,
+      	    "The following data file could not be found:\n\n\t"+file+"\n",
+      	    "Globals::CheckDataFiles"));
+    }
+  }
+}
+
 void Globals::Print(Pitch::errorLevel level) const {
 
   std::stringstream dictionary;
   dictionary << "Parameters loaded in the globals dictionary:\n";
   for (const std::pair<std::string, Global>& el : _globals)
-      dictionary << std::left << std::setw(20) << el.first << el.second << "\n";        
+      dictionary << std::left << std::setw(20) << el.first << el.second << "\n";
 
   dictionary << "\nData files:\n";
   for (const std::string& file : _data_files)
-      dictionary << file << "\n";        
+      dictionary << file << "\n";
 
   Pitch::mout(level) << dictionary.str() << "\n";
 }
@@ -118,18 +140,17 @@ void Globals::LoadCommandLine(int argc, char** argv) {
   }
   long_options.push_back({"configuration_file", required_argument, 0, 	 1});
   long_options.push_back({"help", 		no_argument, 	   0, 	 'h'});
-  long_options.push_back({"verbose", 		no_argument, 	   0, 	 'v'});
   long_options.push_back({NULL, 		0, 		   NULL, 0});
 
   // Define the help message
   std::stringstream help_message;
   help_message << "Usage: ./program [options] files...\n"
-		   "Options:\n";
+		  "Options:\n";
   for (size_t i = 0; i < opt_names.size(); i++)
-      help_message << "  --" << std::left << std::setw(20) << opt_names[i] 
-		   <<  _globals[opt_names[i]].Description() << "\n";        
+      help_message << "  --" << std::left << std::setw(20) << opt_names[i]
+		   <<  _globals[opt_names[i]].Description() << "\n";
 
-  // Look for recognized command line arguments. If the argument does not match any 
+  // Look for recognized command line arguments. If the argument does not match any
   // current entry in the dictionary, throw.
   int c;
   while ( true ) {
@@ -157,18 +178,12 @@ void Globals::LoadCommandLine(int argc, char** argv) {
 	exit(EXIT_SUCCESS);
         break;
 
-      // In this case, reroot the debug messages
-      case 'v':
-  	Pitch::setAnOutput(Pitch::info, std::cerr);
-  	Pitch::setAnOutput(Pitch::debug, std::cout);
-        break;
-
       // In this case, the variable is unknown, throw and print the list of options
       default:
         throw(Exceptions::Exception(Exceptions::recoverable,
 	      "Global variable not defined in the default data cards.\n"
 	      "Run ./program -h or ./program --help for more information.",
-	      "Globals::Update"));	
+	      "Globals::LoadCommandLine"));
     }
   }
 
@@ -194,6 +209,13 @@ void Globals::LoadGeometry() {
 	  "Could not load geometry"+std::string(e.what()),
 	  "Globals::LoadGeometry"));
   }
+}
+
+void Globals::SetVerbosity() {
+
+  // Reset verbosity if requested
+  if ( _globals.find("verbosity") != _globals.end() && _globals.find("log_level") != _globals.end() )
+      Pitch::setOutputs((int)_globals["verbosity"], (int)_globals["log_level"]);
 }
 
 void Globals::SetDefaultStyle() {

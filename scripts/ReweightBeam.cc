@@ -42,7 +42,7 @@ enum Metric {
 /** @brief Computes the amplitudes of particles in the metric defined by covmat
  *
  *  @param	beam		Particle beam object
- *  @param	covmat		Custom metric
+ *  @param	covmat		Custom metric (inverse covariance matrix)
  *
  *  @return			Vector of amplitudes
  */
@@ -50,7 +50,7 @@ std::vector<double> CustomAmplitudes(const Beam::Bunch& beam,
 				     const Matrix<double>& covmat) {
 
   std::vector<double> amps(beam.Size());
-  double eps = beam.NormEmittance().GetValue();
+  double eps = pow(covmat.Inverse().Determinant(), .25)/beam.Mass();
   Matrix<double> x(4, 1), xt(1, 4);
   for (size_t i = 0; i < amps.size(); i++) {
     x[0][0] = beam.Samples("px")[i];
@@ -170,6 +170,8 @@ int main(int argc, char ** argv) {
   if ( globals["corrected"] )
       beam_data.SetCorrectedAmplitudes();
   amps_data = beam_data.Amplitudes();
+  for (size_t i = 0; i < amps_data.size(); i++)
+    amps_data[i] *= 1.;
   Matrix<double> covmat = beam_data.CovarianceMatrix().Inverse();
 
   beam_recmc = Beam::Bunch(rsamples["recmc"], 0., "recmc");
@@ -230,6 +232,7 @@ int main(int argc, char ** argv) {
 
   // Initialize the info box
   InfoBox *info = new InfoBox("Preliminary", maus_version, globals["run_name"], globals["user_cycle"]);
+  info->SetPosition("br", .02, .24);
   drawer.SetInfoBox(info);
 
   // Find the ids of the points to remove from the recmc sample in order for it to agree with data
@@ -392,6 +395,9 @@ int main(int argc, char ** argv) {
 
   // Draw the amplitude scatter plot after reweighting 
   cscat = new TCanvas("c", "c", 1200, 800);
+  std::cerr << beam_data.NormEmittance() << std::endl;
+  std::cerr << beam_recmc.NormEmittance() << std::endl;
+  std::cerr << Math::Mean(beam_recmc.Amplitudes())/4 << std::endl;
   beam_recmc.AmplitudeScatter("x", "px")->Draw();
   cscat->SaveAs("reweight_scat_after.pdf");
   delete cscat;

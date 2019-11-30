@@ -60,7 +60,6 @@ int main(int argc, char ** argv) {
     return 2;
   }
 
-  std::cerr << out_dir << std::endl;
   std::map<std::string, std::vector<std::ofstream*>> out;
   for (const std::string& det : dets) {
     out[det].resize(5);
@@ -111,7 +110,7 @@ int main(int argc, char ** argv) {
 	  vpoint["y"] = ntuple[5];
 	  vpoint["px"] = ntuple[7];
 	  vpoint["py"] = ntuple[8];
-	  vpoint["pz"] = ntuple[9] += .5; // Compensate for eloss in the station
+	  vpoint["pz"] = ntuple[9] += .6; // Compensate for eloss in the station
 
 	  // Fill the true samples
 	  *out[det][st] << "[" << vpoint["x"];

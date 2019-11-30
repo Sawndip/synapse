@@ -26,6 +26,7 @@
 // Additional modules
 #include "DensityEstimator.hh"
 #include "AlphaComplex.hh"
+#include "MST.hh"
 #include "DGaus.hh"
 #include "DMultiGaus.hh"
 #include "DChiSquared.hh"
@@ -40,7 +41,7 @@
 #include "TGraph2D.h"
 #include "TColor.h"
 
-TRandom3 rdmzerr;
+TRandom3 rdmzerr(1);
 
 double ran() {
 
@@ -96,6 +97,9 @@ double ainvgengamma(double* x, double* par) {
 }
 
 int main(int argc, char ** argv) {
+
+  std::vector<int> colors = {kBlack, kMagenta+1, kBlue+1, kCyan+1, kGreen+2, kOrange+1, kRed+1};
+
   gStyle->SetLabelSize(0.04, "XY");
   gStyle->SetTitleSize(0.04, "XY");
   gStyle->SetOptStat(0);
@@ -125,8 +129,8 @@ int main(int argc, char ** argv) {
     simpvertices2.push_back(Vertex({x, y}, TMath::Gaus(x, 0, 1)*TMath::Gaus(y, 0, 1)/(2*M_PI)));
   }
 
-  Interpolator sinterp2(simpvertices2);
-  
+
+  Interpolator sinterp2(simpvertices2, false);
 
   // Create grid
   std::vector<Vertex> intvertices;
@@ -142,6 +146,7 @@ int main(int argc, char ** argv) {
       intvertices2.push_back(Vertex({x, y}, ran()));
     }
   }
+
   Grid grid(intvertices);
   Interpolator interp(grid);
 
@@ -155,7 +160,7 @@ int main(int argc, char ** argv) {
   ginterp->SetLineStyle(2);
   for (size_t i = 0; i < 1001; i++) {
     double x = -3 + (double)i*6./1000;
-    ginterp->SetPoint(i, x, sinterp(x));
+    ginterp->SetPoint(i, x, interp(x));
   }
 
   TF1 *fgaus = new TF1("gaus", "pow(2*TMath::Pi(), -0.5)*TMath::Gaus(x, 0, 1)", -3.5, 3.5);
@@ -166,7 +171,10 @@ int main(int argc, char ** argv) {
   cint->SaveAs("gaus_lint.pdf");
   delete cint;
 
+  
+
   // Print the interp
+//  TH2F* ginterp2 = new TH2F("ginterp2", ";x;y;#rho(x,y)", 100, 0, 1, 100, 0, 1);
   TH2F* ginterp2 = new TH2F("ginterp2", ";x;y;#rho(x,y)", 100, -2, 2, 100, -2, 2);
   for (size_t i = 0; i < ginterp2->GetXaxis()->GetNbins(); i++) {
     for (size_t j = 0; j < ginterp2->GetYaxis()->GetNbins(); j++) {
@@ -179,11 +187,15 @@ int main(int argc, char ** argv) {
   cint = new TCanvas("c", "c", 1200, 800);
   gPad->SetRightMargin(.15);
   ginterp2->Draw("COLZ");
+  ginterp2->SetMinimum(0);
   for (TPolyLine* poly : sinterp2.Meshing())
 	poly->Draw("SAME");
+//  for (TPolyLine* poly : interp2.Meshing())
+//	poly->Draw("SAME");
   cint->SaveAs("random_lint.pdf");
   delete cint;
 
+/*
   Voronoi vor(vorvertices, true, 1);
   vor.Draw("", true, true, true);
   cint = new TCanvas("c", "c", 1200, 800);
@@ -216,7 +228,7 @@ int main(int argc, char ** argv) {
   for (size_t i = 0; i < nv; i++)
       graph2d->SetPoint(i, dtfe.GetVertexArray()[i][0], dtfe.GetVertexArray()[i][1],
 						dtfe.GetVertexArray()[i].GetValue());
-     
+
   cdtfe = new TCanvas("c", "c", 800, 800);
   graph2d->Draw("PCOL");
   cdtfe->SaveAs("dtfe2.pdf");
@@ -235,7 +247,7 @@ int main(int argc, char ** argv) {
   TF1 *ftane5 = new TF1("tane5", gengamma, 0, 5, 3);
   ftane5->SetParameters(0.61, 3.49, 2.08);
   std::vector<TF1*> ftanes = {ftane1, ftane2, ftane3, ftane4, ftane5};
-*/
+*//*
   std::vector<TF1*> ftanes(6);
   for (size_t i = 0; i < 6; i++) {
     ftanes[i] = new TF1(TString::Format("tane%d", (int)i), agengamma, 0, 3, 1);
@@ -252,7 +264,7 @@ int main(int argc, char ** argv) {
   finvtane4->SetParameters(0.70, 2.97, 1.97);
   TF1 *finvtane5 = new TF1("invtane5", invgengamma, 0, 5, 3);
   finvtane5->SetParameters(0.61, 3.49, 2.08);
-*/
+*//*
   std::vector<TF1*> finvtanes(6);
   for (size_t i = 0; i < 6; i++) {
     finvtanes[i] = new TF1(TString::Format("invtane%d", (int)i), ainvgengamma, 0, 3, 1);
@@ -263,7 +275,6 @@ int main(int argc, char ** argv) {
   legtane->SetFillStyle(0);
   legtane->SetLineColorAlpha(0, 0);
 
-  std::vector<int> colors = {kBlack, kMagenta+1, kBlue+1, kCyan+1, kGreen+2, kOrange+1, kRed+1};
   for (size_t i = 0; i < ftanes.size(); i++) {
     ftanes[i]->SetLineWidth(2);
     finvtanes[i]->SetLineWidth(2);
@@ -277,7 +288,7 @@ int main(int argc, char ** argv) {
     finvtanes[i]->SetLineStyle(i+1);
     legtane->AddEntry(ftanes[i], TString::Format("d=%d", (int)i+1), "l");
   }
-  
+
   TCanvas* canv = new TCanvas("c", "c", 1200, 800);
   ftanes[5]->Draw();
   ftanes[5]->SetTitle(";#upsilon; f_{d} (#upsilon)");
@@ -367,7 +378,7 @@ int main(int argc, char ** argv) {
 //  delete cv;
 
 
-  
+
 
   std::cerr << "n=2: " << prefactor(2) << std::endl;
   std::cerr << "n=3: " << prefactor(3) << std::endl;
@@ -392,7 +403,7 @@ int main(int argc, char ** argv) {
      totarea += areas[i];
      if ( areas[i] > 2*1e-4 )
 	std::cerr << areas[i] << std::endl;
-  }*/
+  }*//*
 
   std::vector<double> areas;
   Voronoi vorr(s2, false);
@@ -532,8 +543,8 @@ int main(int argc, char ** argv) {
       pol->SetLineWidth(2);
       pol->Draw("SAME");
   }
-  cdel->SaveAs("del2.pdf");*/
-  
+  cdel->SaveAs("del2.pdf");*//*
+
 
   // Draw the PDFs and CDFs
   std::vector<DFunction*> funcs;
@@ -548,7 +559,7 @@ int main(int argc, char ** argv) {
   std::vector<TGraph*> cdfs;
   std::vector<std::string> names =
 	{"Triangular (#times0.5)", "Exponential", "Cauchy", "Gaus", "Maxwell", "Uniform"};
-  
+
   TLegend *leg = new TLegend(.65, .6, .89, .89);
   TLegend *legcdf = new TLegend(.65, .15, .89, .44);
   leg->SetFillStyle(0);
@@ -593,7 +604,7 @@ int main(int argc, char ** argv) {
       cdf->Draw("SAME");
   legcdf->Draw("SAME");
   c->SaveAs("CDF.pdf");
-  delete c;
+  delete c;*/
 
   TGraph *graph1 = new TGraph();
   graph1->SetTitle("L^{1}");
@@ -617,7 +628,7 @@ int main(int argc, char ** argv) {
   graphinf->SetMarkerSize(2);
   graphinf->SetMarkerColor(colors[2]);
 
-  TMultiGraph* glp = new TMultiGraph("glp", ";n;V_{p}/R^{n}");
+  TMultiGraph* glp = new TMultiGraph("glp", ";d;V_{p} /R^{d}");
   glp->Add(graph1, "P");
   glp->Add(graph2);
   glp->Add(graphinf);
@@ -627,14 +638,14 @@ int main(int argc, char ** argv) {
     graph2->SetPoint(i, i+1, pow(M_PI, (double)(i+1)/2)/TMath::Gamma((double)(i+1)/2+1));
     graphinf->SetPoint(i, i+1, pow(2, i+1));
   }
-  c = new TCanvas("c", "c", 1200, 800);
+  TCanvas* cl = new TCanvas("c", "c", 1200, 800);
   gPad->SetGridx();
   gPad->SetGridy();
   gPad->SetLogy();
   glp->Draw("AP");
-  gPad->BuildLegend(.15, .15, .25, .3);
-  c->SaveAs("contour_volume.pdf");
-  delete c;  
+  gPad->BuildLegend(.15, .15, .25, .35);
+  cl->SaveAs("contour_volume.pdf");
+  delete cl;
 
 
   ////////////////////////////////////////////
@@ -671,6 +682,9 @@ int main(int argc, char ** argv) {
     std::vector<std::vector<double>> points_mice_2d = points_mice;
     for (size_t i = 0; i < points_mice.size(); i++)
         points_mice_2d[i].resize(2);
+
+    MST mst(points_mice_2d);
+    mst.Paint("MICE", true, {"root", "pdf"});
 
     rho = 1./4;
     R = 1.25/sqrt(rho*points_mice.size());
@@ -730,7 +744,7 @@ int main(int argc, char ** argv) {
   AlphaComplex tempcomp;
   size_t nmax = 1e5;
   size_t i, j;
-  for (i = 0; i < functions.size(); i++) {  
+  for (i = 0; i < functions.size(); i++) {
     // Fetch the parameters of the current distribution under test
     dim = functions[i]->Dimension();
     vol = functions[i]->ContourVolume(alpha);

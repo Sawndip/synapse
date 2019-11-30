@@ -68,7 +68,7 @@ TH2F* Drawer::New2DHistogram(const std::string& name,
 		     	     const std::string& vary) const {
 
   VarSet setx = _varsets.at(varx);
-  VarSet sety = _varsets.at(varx);
+  VarSet sety = _varsets.at(vary);
   std::string x_title = setx.label+" ["+setx.unit+"]";
   std::string y_title = sety.label+" ["+sety.unit+"]";
 
@@ -99,7 +99,7 @@ THStack* Drawer::NewStack(std::map<std::string, TH1F*> hists) const {
   // Set the style of each histogram according to its data type,
   // add them to a stack with the appropriate drawing options
   THStack* hs = new THStack();
-  for (const std::string& type : {"recmc", "truth", "data"})
+  for (const std::string& type : _types)
     if ( hists.find(type) != hists.end() ) {
       SetStyle(hists[type], type);
       hs->Add(hists[type], _options.at(type).hist_opt);
@@ -141,7 +141,7 @@ std::map<std::string, TPaveStats*> Drawer::NewStackStats(std::map<std::string, T
       stats[hist.first] = new TPaveStats(.64, .9-(id+1)*h, .9, .9-id*h, "NDC");
       stats[hist.first]->SetTextFont(42);
       stats[hist.first]->SetFillStyle(0);
-       
+
       TText *title = stats[hist.first]->AddText(TString::Format("%s = ", _options.at(hist.first).title));
       title->SetTextFont(62);
       if ( draw_opt.find("E") != std::string::npos )
@@ -163,7 +163,8 @@ std::map<std::string, TPaveStats*> Drawer::NewStackStats(std::map<std::string, T
 }
 
 THStack* Drawer::DrawStack(std::map<std::string, TH1F*> hists,
-		      	   const std::string& name) const {
+		      	   const std::string& name,
+			   const std::string draw_opt) const {
 
   // Draw the THStack
   THStack* hs = NewStack(hists);
@@ -172,7 +173,7 @@ THStack* Drawer::DrawStack(std::map<std::string, TH1F*> hists,
 
   // Draw the stat boxes
   double hoffset = 0;
-  for ( std::pair<std::string, TPaveStats*> stat : NewStackStats(hists, "EM", &hoffset) )
+  for ( std::pair<std::string, TPaveStats*> stat : NewStackStats(hists, draw_opt, &hoffset) )
       stat.second->Draw("SAME");
 
   // Draw the legend
@@ -187,7 +188,8 @@ THStack* Drawer::DrawStack(std::map<std::string, TH1F*> hists,
 
 void Drawer::SaveStack(std::map<std::string, TH1F*> hists,
 		       const std::string& name,
-		       bool ratio) const {
+		       bool ratio,
+		       const std::string draw_opt) const {
 
   // Initialize the TCanvas and partition it if requested
   TCanvas* c = new TCanvas("c", "c", 1200, 800);
@@ -200,7 +202,7 @@ void Drawer::SaveStack(std::map<std::string, TH1F*> hists,
   }
 
   // Draw stack and surrounding info boxes
-  THStack* hs = DrawStack(hists, name);
+  THStack* hs = DrawStack(hists, name, draw_opt);
 
   // If requested, initialize the ratio and draw it on the second pad
   if ( ratio && hists.find("data") != hists.end() && hists.find("recmc") != hists.end() ) {
@@ -256,7 +258,7 @@ TMultiGraph* Drawer::NewMultiGraph(std::map<std::string, TGraphErrors*> graphs) 
   // Set the style of each graph according to its data type,
   // add them to a multigraph with the appropriate drawing options
   TMultiGraph* mg = new TMultiGraph();
-  for (const std::string& type : {"truth", "recmc", "data"})
+  for (const std::string& type : _types)
     if ( graphs.find(type) != graphs.end() ) {
       SetStyle(graphs[type], type);
       mg->Add(graphs[type], _options.at(type).graph_opt);
@@ -353,7 +355,7 @@ void Drawer::SaveMultiGraph(std::map<std::string, TGraphErrors*> graphs,
 TH1F* Drawer::ProjectionMeanX(TH2F* hist,
 		      	      bool fit) const {
 
-  TH1F* h1d = new TH1F(TString::Format("%s_1d", hist->GetName()),
+  TH1F* h1d = new TH1F(TString::Format("%s_1d_mean", hist->GetName()),
 		       TString::Format("%s;%s;%s", hist->GetTitle(), 
 		       hist->GetXaxis()->GetTitle(), hist->GetYaxis()->GetTitle()),
 		       hist->GetNbinsX(), hist->GetXaxis()->GetXmin(), hist->GetXaxis()->GetXmax());
@@ -379,10 +381,50 @@ TH1F* Drawer::ProjectionMeanX(TH2F* hist,
       error = fgaus->GetParError(1);
     }
 
-    if ( error > mean )
-	continue;
+//    if ( error > mean )
+//	continue;
 
     h1d->SetBinContent(k+1, mean);
+    h1d->SetBinError(k+1, error);
+    delete hproj;
+  }
+
+  return h1d;
+}
+
+TH1F* Drawer::ProjectionRMSX(TH2F* hist,
+		      	     bool fit) const {
+
+  TH1F* h1d = new TH1F(TString::Format("%s_1d_rms", hist->GetName()),
+		       TString::Format("%s;%s;%s", hist->GetTitle(), 
+		       hist->GetXaxis()->GetTitle(), hist->GetYaxis()->GetTitle()),
+		       hist->GetNbinsX(), hist->GetXaxis()->GetXmin(), hist->GetXaxis()->GetXmax());
+
+  TF1* fgaus;
+  if ( fit )
+      fgaus = new TF1("fgaus", "[0]*TMath::Gaus(x, [1], [2])", -1e3, 1e3);
+
+  size_t k;
+  TH1D* hproj;
+  double rms, error;
+  for (k = 0; k < (size_t)hist->GetNbinsX(); k++) {
+    hproj = hist->ProjectionY("bin", k+1, k+1);
+
+    if ( !fit ) {
+      rms = hproj->GetRMS();
+      error = hproj->GetRMSError();
+    } else {
+      fgaus->SetRange(hproj->GetMean()-hproj->GetRMS(), hproj->GetMean()+hproj->GetRMS());
+      fgaus->SetParameters(hproj->GetMaximum(), hproj->GetMean(), hproj->GetRMS());
+      hproj->Fit(fgaus, "RQ");
+      rms = fgaus->GetParameter(2);
+      error = fgaus->GetParError(2);
+    }
+
+//    if ( error > rms )
+//	continue;
+
+    h1d->SetBinContent(k+1, rms);
     h1d->SetBinError(k+1, error);
     delete hproj;
   }
@@ -396,14 +438,14 @@ void Drawer::Initialize() {
   gStyle->SetOptStat(0);
 
   // Set the known data types
-  _types = {"truth", "recmc", "data"};
+  _types = {"utruth", "truth", "recmc", "data"};
 
   // Set the known variables and their characteristics
   _vars = {"x", "y", "px", "py", "pz"};
   std::vector<std::string> labels = {"x", "y", "p_{x}", "p_{y}", "p_{z}"};
   std::vector<std::string> units = {"mm", "mm", "MeV/c", "MeV/c", "MeV/c"};
-  std::vector<double> llims = {-250, -250, -100, -100, 0};
-  std::vector<double> ulims = {250, 250, 100, 100, 250};
+  std::vector<double> llims = {-250, -250, -100, -100, 50};
+  std::vector<double> ulims = {250, 250, 100, 100, 200};
   for (size_t i = 0; i < _vars.size(); i++) {
     std::string var = _vars[i];
     _varsets[var].label = labels[i];
@@ -413,12 +455,25 @@ void Drawer::Initialize() {
   }
 
   // Initialize the default style for each data type
+  _options["utruth"].title = "Uncut Truth";
+  _options["utruth"].line_color = kMagenta+2;
+  _options["utruth"].fill_style = 1000;
+  _options["utruth"].fill_color = kMagenta+2;
+  _options["utruth"].fill_alpha = .5;
+  _options["utruth"].marker_style = 28;
+  _options["utruth"].marker_color = kMagenta+2;
+  _options["utruth"].hist_opt = "hist";
+  _options["utruth"].graph_opt = "lpe3";
+  _options["utruth"].hist_leg = "f";
+  _options["utruth"].graph_leg = "lpf";
+
   _options["truth"].title = "Truth";
   _options["truth"].line_color = kBlue+2;
   _options["truth"].fill_style = 1000;
   _options["truth"].fill_color = kBlue+2;
   _options["truth"].fill_alpha = .5;
   _options["truth"].marker_style = 27;
+  _options["truth"].marker_color = kBlue+2;
   _options["truth"].hist_opt = "hist";
   _options["truth"].graph_opt = "lpe3";
   _options["truth"].hist_leg = "f";
@@ -465,7 +520,7 @@ void Drawer::SetStyle(TGraph* graph,
 
   // Set the line style
   graph->SetLineStyle(_options.at(type).line_style);
-  graph->SetLineColor(_options.at(type).line_color);
+  graph->SetLineColor(_options.at(type).marker_color);
   graph->SetLineWidth(_options.at(type).line_width);
 
   // Set the fill style
@@ -485,9 +540,9 @@ void Drawer::DrawMICEModules(const double& miny,
   GeometryHandler geoh = Globals::GetInstance().GetGeometryHandler();
   for (const std::string det : {"tku", "tkd"}) { 
     for (size_t st = 0; st < 5; st++) {
-	TLine *line = new TLine(geoh[det][st].z(), miny, geoh[det][st].z(), maxy);
-	line->SetLineColorAlpha(4, .5);
-	line->Draw("SAME");
+      TLine *line = new TLine(geoh[det][st].z(), miny, geoh[det][st].z(), maxy);
+      line->SetLineColorAlpha(4, .5);
+      line->Draw("SAME");
     }
   }
 

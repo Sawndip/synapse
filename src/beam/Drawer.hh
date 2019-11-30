@@ -55,7 +55,7 @@ struct VarSet {
   std::string unit;		///< Unit in which the variable is expressed
   double llim;			///< Lower limit of the corresponding axis
   double ulim;			///< Upper limit of the corresponding axis
-  size_t nbins = 100;		///< Number of bins
+  size_t nbins = 50;		///< Number of bins
 };
 
 /** @brief Stores the default drawing options and methods to produce ROOT plots
@@ -85,6 +85,17 @@ class Drawer {
    */
   void SetVariableSettings(const std::string& var,
 		      	   const VarSet& varset)	{ _varsets[var] = varset; }
+
+  /** @brief Returns the limits of the specified variable
+   *
+   *  @param	var	Name of the variable
+   *  @param	llim	Lower limit
+   *  @param	ulim	Upper limit
+   */
+  void GetVariableLimits(const std::string& var,
+		 	 double& llim,
+	         	 double& ulim)			{ llim = _varsets[var].llim;
+							  ulim = _varsets[var].ulim; }
 
   /** @brief Sets the limits of the specified variable
    *
@@ -164,21 +175,25 @@ class Drawer {
    *
    *  @param	hists		Map of histograms that form the stack
    *  @param	name		File name
+   *  @param	draw_opt	Stat drawing options ("E" for entries, "M" for mean, "R" for RMS)
    *
    *  @return			Pointer to the drawn stack
    */
   THStack* DrawStack(std::map<std::string, TH1F*> hists,
-		     const std::string& name) const;
+		     const std::string& name,
+		     const std::string draw_opt="EM") const;
 
   /** @brief Saves superimposed data types histograms
    *
    *  @param	hists		Map of histograms that form the stack
    *  @param	name		File name
    *  @param	ratio		Draws the ratio data/simulation
+   *  @param	draw_opt	Stat drawing options ("E" for entries, "M" for mean, "R" for RMS)
    */
   void SaveStack(std::map<std::string, TH1F*> hists,
 		 const std::string& name,
-		 bool ratio=false) const;
+		 bool ratio=false,
+		 const std::string draw_opt="EM") const;
 
   /** @brief Initializes a multigraph of graphs of different data types
    *
@@ -244,6 +259,16 @@ class Drawer {
   TH1F* ProjectionMeanX(TH2F* hist,
 		        bool fit = false) const;
 
+  /** @brief Produces a TH1F of the RMS Y as a function of X from a TH2F
+   *
+   *  @param	hist		Input 2D histogram
+   *  @param	fit		Flag for Gaussian peak fitting
+   *
+   *  @return			Pointer to the initialized projected histogram
+   */
+  TH1F* ProjectionRMSX(TH2F* hist,
+		       bool fit = false) const;
+
   /** @brief Sets the info box
    *
    *  @param	obj	MAUS info box object
@@ -252,11 +277,6 @@ class Drawer {
 
   /** @brief Returns a pointer to the info box */
   InfoBox* GetInfoBox() const				{ return _info; }
-
- private:
-
-  /** @brief Initializes the default drawing options **/
-  void Initialize();
 
   /** @brief Sets the histogram style according to the predefined options
    *
@@ -273,6 +293,11 @@ class Drawer {
    */
   void SetStyle(TGraph* obj,
 	   	const std::string& type) const;
+
+ private:
+
+  /** @brief Initializes the default drawing options **/
+  void Initialize();
 
   /** @brief Draws the MICE beam line elements onto an evolution graph
    *

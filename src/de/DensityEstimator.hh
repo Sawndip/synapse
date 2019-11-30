@@ -93,6 +93,12 @@ class DensityEstimator {
    */
   double Evaluate(const double* v) const;
 
+  /** @brief Compute the nonparametric density in each training sample point */
+  void SetDensityLevels();
+
+  /** @brief Returns the nonparametric density in each training sample point */
+  const std::vector<double>& DensityLevels() const		{ return _levs; }
+
   /** @brief Returns the volume of an alpha contour of the probability density function
    *
    *  @param	alpha		Integrated probability to achieve
@@ -111,7 +117,7 @@ class DensityEstimator {
 		       std::vector<double> upper=std::vector<double>(),
 		       const size_t nsamples=1e6);
 
-  /** @brief Returns the uncertainty on the uncertainty on the reconstructed contour volume
+  /** @brief Returns the uncertainty on the reconstructed contour volume
    *
    *  @return			Contour volume uncertainty
    */
@@ -147,6 +153,12 @@ class DensityEstimator {
 
   /** @brief Returns the dimension of the space in which the estimator is constructed */
   const size_t& GetDimension() const			{ return _dim; }
+
+  /** @brief Returns the name of the algorithm used to build the estimate */
+  const std::string& GetAlgorithm() const		{ return _algo; }
+
+  /** @brief Returns the name of estimator */
+  const std::string& GetName() const			{ return _name; }
 
   /** @brief Returns the points on which the DensityEstimator is constructed */
   const std::vector<std::vector<double>>& GetPoints() const
@@ -240,6 +252,7 @@ class DensityEstimator {
   std::string				_name;		///< Name of the density estimator
   std::string				_algo;		///< Density estimation algorithm
   std::vector<std::vector<double>>	_points;	///< Array of input points
+  std::vector<double>			_levs;		///< Value of the estimator in the points
   OptimalBinning			_ob;		///< Optimal binning density estimator
   KNearestNeighbours    		_knn;		///< kNN density estimator
   LocalReachability		    	_lrd;		///< LRD density estimator

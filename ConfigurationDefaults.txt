@@ -1,9 +1,18 @@
-# Current setting
-geometry_filename 	/home/frans/mice/synapse/bin/geometries/2017-02_7/ParentGeometryFile.dat			# Path to the geometry file
-user_cycle		2017/03		# ISIS user cycle
-run_name		7 		# Run name
+# General settings
+verbosity		1	# 0=debug, 1=info, 2=warning, 3=error, 4=fatal
+log_level               0       # 0=log nothing, 1=log log messages, 2=log every output
 
-# Data type to be processed
+# MICE variables
+#geometry_filename 	/home/frans/mice/synapse/bin/geometries/2016-04_1-2/ParentGeometryFile.dat # Path to the geometry file
+#geometry_filename 	/home/frans/mice/synapse/bin/geometries/2016-05_1/ParentGeometryFile.dat
+geometry_filename 	/home/frans/mice/synapse/bin/geometries/2017-02_7/ParentGeometryFile.dat
+mice			1	# MICE beam line flag (0/1)
+user_cycle		2017/03	# ISIS user cycle
+run_name		7 	# Run name
+maus_version		3.2.0	# MAUS software release version
+
+# Data types to be processed
+utruth			0	# Uncut truth processing (0/1)
 truth			1	# Truth processing flag (0/1)
 recmc			1	# Reconstructed MC processing flag (0/1)
 data			1	# Data processing flag (0/1)
@@ -13,7 +22,7 @@ de			0	# Density estimation flag (0/1)
 de_algo			knn	# Density estimation algorithm
 
 # Reconstruction options
-mice			1	# MICE beam line flag (0/1)
+maxn			100000  # Maximum number of particles to import
 frac			.09	# Fraction of the beam to consider
 min_vid			47	# ID of the first virtual plane to consider (35)
 tku_vid			64	# Upstream virtual reference plane ID (36, 35, 52)
@@ -24,35 +33,39 @@ max_vid			96	# ID of the last virtual plane to consider (80)
 # Amplitude calculation options
 corrected		0	# Corrected amplitude flag (0/1)
 mcd			0	# Minimum Covariance Determinant amplitude flag (0/1)
-generalised		0	# Generalised density amplitude flag (0/1)
 significance		0	# Computes the excess significance (0/1)
 rebin			0	# Rebin the histogram with equal phase-space volumes (0/1)
-poincare		1	# Print the Poincare sections of the beam (0/1)
-voronoi			0	# Voronoi tesselation flag (0/1)
+poincare		0	# Print the Poincare sections of the beam (0/1)
 
 # Import variables
-import_filename		import_2017-02_7_6mm_lih_pure_sim.root	# Name of the file produced by the importers
+import_filename		import.root	# Name of the file produced by the importers
 chunked			1	# For a simulation divided in chunks, must offset the spills
-nvirtuals		150	# Number of virtual planes in the simulation (150, 90)
+notofs			0	# True if the simulation did not include the TOFs (0/1)
+tof0_vid		11	# Virtual plane ID of the front of TOF0
+tof1_vid		32 	# Virtual plane ID of the front of TOF1
+tkd3_vid		88	# Donwstream virtual station 3 plane ID
+
+# Data cuts
+diagnostics		1	# Produce diagnostic plots (0/1)
+
+through_part		0	# Only keep particle that do not scrape (0/1)
 aperture		-1	# Global radial aperture, MICE default if -1 [mm]
+diffuser_thickness	15	# Diffuser thickness as reported on the MICE CDB
+absorber		0	# Absorber setting (0=Empty, 1=LiH, 2=LH2Empty, 3=LH2)
+
 do_pid			1	# Particle identification flag (0/1)
 fit_pid			0	# Fit the Tof01 profile to optain the boundaries (0/1)
-total_momentum_cut	1	# Cut on total momentum rather than pz (0/1)
-min_momentum		135	# Minimum accepted momentum [MeV/c]
-max_momentum		145	# Maximum accepted momentum [MeV/c]
-tkd_min_momentum	50	# Minimum accepted downstream momentum [MeV/c]
-tkd_max_momentum	200	# Maximum accepted downstream momentum [MeV/c]
-tracker_fiducial	150	# Fiducial radius of the trackers [mm]
-ref_vid			64	# Virtual plane ID at which to do the selection (52)
-notofs			1	# True if the simulation did not include the TOFs (0/1)
-through_part		0	# Only keep particle that do not scrape (0/1)
-diagnostics		1	# Produce diagnostic plots during importation (0/1)
-tof0_vid		11	# Virtual plane ID of the front of TOF0
-tof1_vid		32 #NO	# Virtual plane ID of the front of TOF1
-tkd3_vid		88	# Donwstream virtual station 3 plane ID
-tofmin			27	# Lower limit of the muon time-of-flight peak
-tofmax			32	# Upper limit of the muon time-of-flight peak
-compare_cut		all	# Level of cut to compare between data types
+
+total_mom_cut		1	# Cut on total momentum rather than pz (0/1)
+tku_mom_min		135	# Minimum accepted upstream momentum [MeV/c]
+tku_mom_max		145	# Maximum accepted upstream momentum [MeV/c]
+tkd_mom_min		50	# Minimum accepted downstream momentum [MeV/c]
+tkd_mom_max		250	# Maximum accepted downstream momentum [MeV/c]
+tk_chi2			10	# Maximum chi squared over ndf of a tracker track
+tk_fiducial		150	# Fiducial radius of the trackers [mm]
+
+tof_min			27	# Lower limit of the muon time-of-flight peak
+tof_max			32	# Upper limit of the muon time-of-flight peak
 
 # Reweighting parameters
 reweight_alg		0	# 0:most distant bin, 1:bin by bin
@@ -62,13 +75,14 @@ reweight_metric		0	# 0:own metric, 1:data's metric
 run_number		10000	# MAUS run number being conveted to JSON
 
 # Toy input beam parameters
+toy_dim			4	# Dimension of the transverse phase space (2 or 4)
 toy_mass		105.66	# Particle mass [MeV/c^2]
-toy_n			1e4	# Number of particles to generate
+toy_n			1000000	# Number of particles to generate
 toy_seed		-1	# Seed for beam production, -1 randomizes the seed
-toy_eps			2.5	# Input normalised emittance [mm]
+toy_eps			10	# Input normalised emittance [mm]
 toy_mom			140	# Central momentum [MeV/c]
-toy_alpha		-2	# Optical alpha function at the absorber
-toy_beta		1300	# Optical beta function at the absorber [mm]
+toy_alpha		0	# Optical alpha function at the absorber
+toy_beta		520	# Optical beta function at the absorber [mm]
 
 # Toy physics processes
 toy_scat		1	# Turn on scattering in the absrober (0/1)

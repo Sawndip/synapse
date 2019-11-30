@@ -72,30 +72,35 @@ class Extractor {
    *
    *  @param	data_type	Type of data
    *  @param	plane_id	Requested plane ID
+   *  @param	maxn		Maximum number of tracks to import
    *  @param	measerr		Extract the measurement errors
    *
    *  @return 			Bunch object at the specified plane ID
    */
   Bunch GetBunch(const std::string& data_type,
 	         const size_t plane_id,
+		 size_t maxn=0,
 	         const bool measerr=false) const;
 
   /** @brief Extracts beam at every requested z position
    *
    *  @param	data_type	Type of data
    *  @pram	plane_ids	Requested plane IDs. if empty, extracts everything
+   *  @param	maxn		Maximum number of tracks to import
    *  @param	measerr		Extract the measurement errors
    *
    *  @return 			Stream object for the selected plane IDs
    */
   Stream GetStream(const std::string& data_type,
 		   const std::vector<size_t> plane_ids=std::vector<size_t>(),
+		   size_t maxn=0,
 		   const bool measerr=false) const;
 
   /** @brief Extracts beam at every requested z position and for the requested data types
    *
    *  @param	data_types	Types of data
    *  @pram	plane_ids	Map of requested plane IDs. If empty, extracts everything
+   *  @param	maxn		Maximum number of tracks to import
    *  @param	measerr		Extract the measurement errors
    *
    *  @return 			Stream object for the selected plane IDs
@@ -104,6 +109,7 @@ class Extractor {
 	GetStreams(const std::vector<std::string>& data_types,
 		   const std::map<std::string, std::vector<size_t>> plane_ids =
 			 std::map<std::string, std::vector<size_t>>(),
+		   size_t maxn=0,
 		   const bool measerr=false) const;
 
   /** @brief Sets the run name */

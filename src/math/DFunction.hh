@@ -159,6 +159,9 @@ class DFunction {
   /** @brief Returns a random vector sampled from the distribution */
   virtual std::vector<double> RandomVector() = 0;
 
+  /** @brief Sets the seed of the random number generator */
+  void SetSeed(const int seed)				{ _rdmzer.SetSeed(seed); }
+
   /** @brief Returns the upper bound of axis i */
   void SetRange(const double lower,
 		const double upper,
@@ -211,12 +214,12 @@ class DFunction {
   /** @brief Returns a radial graph of the cummulative density function */
   TGraph* GraphCDFRadial() const;
 
-  /** @brief Draws the function on whichever TCanvas is currently being used (ROOT) 
+  /** @brief Draws the function on whichever TCanvas is currently being used (ROOT)
    *
    *  @param	opt	Drawing options
    *  @param	idx	ID of the first coordinate to represent
    *  @param	idy	ID of the second coordinate to represent
-   *  @param	x	Point that the projection intersects	
+   *  @param	x	Point that the projection intersects
    */
   void Draw(const std::string opt="", int idx=0, int idy=1,
 		std::vector<double> x=std::vector<double>()) const;
@@ -232,7 +235,7 @@ class DFunction {
    *  @param	opt	Drawing options
    *  @param	idx	ID of the first coordinate to represent
    *  @param	idy	ID of the second coordinate to represent
-   *  @param	x	Point that the projection intersects	
+   *  @param	x	Point that the projection intersects
    */
   void Print(const std::string opt="", int idx=0, int idy=1,
 		std::vector<double> x=std::vector<double>()) const;

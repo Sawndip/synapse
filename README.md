@@ -11,20 +11,20 @@ novel in accelerator physics.
 
 This package was developed with the intention of measuring the
 evolution of the transverse phase space of muons across an absorber
-in the context of the 
+in the context of the
 [Muon Ionization Cooling Experiment (MICE)](http://mice.iit.edu).
-The experiment measures the phase space of 
-individual beam muons before and after passing through the absorber 
+The experiment measures the phase space of
+individual beam muons before and after passing through the absorber
 and builds ensembles at the analysis level. Beam non linearties and
 transmission losses experienced in the magnetic channel
-motivated the development of non-standard phase space density 
+motivated the development of non-standard phase space density
 estimation techniques. The techniques rely on the concept of
-particle amplitude and 
+particle amplitude and
 [nonparametric density estimation](https://en.wikipedia.org/wiki/Nonparametric_statistics).
 Support was added for G4Beamline ASCII output in order
 to broaden the scope of the package.
 
-This code is aimed at measuring and outputting a broad array 
+This code is aimed at measuring and outputting a broad array
 of beam parameters (thoroughly described in the following),
 provided with a set phase space coordinate measurements,
 i.e. (x, y, px, py, pz), of a beam at a single or a set
@@ -104,10 +104,6 @@ A custom set of cards may be used to overwrite the default by running
 
 The list of available cards and their definition may be printed by running
 using the flag --help or -h.
-
-Running the program with the option --verbose or -v will print out the
-debugging information when the program is ran by rerouting the Pitch::debug
-to std::out.
 
 ## 3.2. Input
 
@@ -202,7 +198,7 @@ statistics along the beam line. The parameters include
   - &alpha;-fractional emittance &epsilon;<sub>&alpha;</sub>.
 
 All the quantities are provided with a measurement uncertainty (if
-the data has been reconstructed) and a statistical uncertainty. The 
+the data has been reconstructed) and a statistical uncertainty. The
 quantities are computed and compiled in a single Beam class built
 for each z position at which the beam is sampled.
 
@@ -238,7 +234,6 @@ in the datacards.
 A series of flags are available in the datcards:
   - '**corrected**' computes the amplitudes by recursively removing high amplitudes;
   - '**mcd**' computes the amplitudes based on the MCD covariance matrix;
-  - '**generalised**' uses non parametric density estimation to produce amplitudes;
   - '**significance**' computes the significance of the difference between each amplitude bin;
   - '**rebin**' bins the data in buckets of equal phase space volume;
   - '**poincare**' produces Poincare sections of the phase space.
@@ -306,7 +301,7 @@ ReweightBeam.cc is executed as follows
     ./density [options] import_data.root import_sim.root
 
 This algorithm computes the amplitude distributions of the source
-(import_sim.root) and the target (import_data.root) and reweights the 
+(import_sim.root) and the target (import_data.root) and reweights the
 source to fit the target distribution. This allows to match simulations
 to the observed distributions.
 
@@ -333,8 +328,8 @@ TestEstimatorQuality.cc is executed as follows
     ./test_quality [options]
 
 This algorithm qualitatively tests the performance of a nonparametric
-density estimator at reproducing the true underlying density profile of 
-a known distribution. The input parameters are specified in the 
+density estimator at reproducing the true underlying density profile of
+a known distribution. The input parameters are specified in the
 configuration defaults:
   - '**de_algo**' specifies the class of density estiator to test.
 
@@ -394,13 +389,12 @@ TestAmplitudeRecon.cc is executed as follows
     ./test_amplitude [options]
 
 The algorithm tests the different modes of amplitude reconstruction and their
-performance in non-linear scenarios. It also compares the different 
+performance in non-linear scenarios. It also compares the different
 amplitude reconstruction scheme with each other.
 
 A series of flags are available in the datcards:
   - '**corrected**' computes the amplitudes by recursively removing high amplitudes;
   - '**mcd**' computes the amplitudes based on the MCD covariance matrix;
-  - '**generalised**' uses non parametric density estimation to produce amplitudes.
 
 
 --------------------
@@ -414,7 +408,7 @@ ToySimulation.cc is executed as follows
 
 ## 6.1 Generation
 
-The generator produces a Gaussian beam based on the cards specified in the 
+The generator produces a Gaussian beam based on the cards specified in the
 ConfigurationsDefaults.txt or in the command line arguments:
   - '**toy_mass**' specifies the mass of the beam particles in MeV/c^2;
   - '**toy_n**' specifies the amount of particles to be generated;
@@ -452,10 +446,10 @@ toy absorber. One may add:
  - '**toy_drift**' adds a drift space of required length in mm;
  - '**toy_sol**' adds a solenoid of required length in mm.
 
-The beam line elements are reprensted by unitary transfer matrices that rotate 
+The beam line elements are reprensted by unitary transfer matrices that rotate
 the phase space vectors of the beam particles in a linear fashion through
 
-![equation](https://latex.codecogs.com/gif.latex?%5Cmathbf%7Bx%7D%27%20%3D%20%5Cmathbf%7BM%7D%5Cmathbf%7Bx%7D%2C) 
+![equation](https://latex.codecogs.com/gif.latex?%5Cmathbf%7Bx%7D%27%20%3D%20%5Cmathbf%7BM%7D%5Cmathbf%7Bx%7D%2C)
 
 which in turn transforms the covariance matrix throuh
 
@@ -499,16 +493,39 @@ Density estimation package
     + Delaunay triangulation (Delaunay);
     + Voronoi tesselation (Voronoi);
     + Alpha-complicies (AlphaComplex).
+    + Minimal spanning trees (MST)
   - Interpolators to fill the gaps between discrete estimates
     + n-linear interpolator (LinearInterpolator);
     + simplical interpolator (SimplexInterpolator).
 
- 
+
 --------------------
 
 # 8. Latest version updates
 
+Version **0.7.0**
+
+  - Added flexible verbosity setting in data cards
+  - Added MiceTrack.cc with a track object that contains all the useful track information
+  - Restructed the import functions around the MiceTrack object
+  - Combined ImportMAUSData.cc and ImportMAUSSimulation.cc scripts to ImportMice.cc
+  - Added TransferMatrix.cc that computes the beam transfer matrix between upstream and downstream
+  - Added several scripts for MICE data analysis 
+    - ApplyCuts.cc applies data cuts specified in the configuration file to the imported MICE data
+    - Calibrate.cc produces beam diagnostics plots (1D, Poincare)
+    - CombinedFitDebug.cc evaluates the quality of the TOF-Tracker combined momentum fit
+    - Resolution.cc evaluates the experimental resolutions
+    - SystematicCorrections.cc split into Amplitude, Density and PhaseSpce files
+  - Completely revamped the Toy simulation
+    - Added Generator.cc that produces toy beams of requested characteristics
+    - Added MaterialDefinitions.cc for relevant beamline elements
+    - Remove ToyTools.cc
+  - Improvements to the statistics and DE packages
+  - Added Minimum Spanning Tree (MST)
+  - Many bug fixes and code refactoring
+
 Version **0.6.0**
+
   - Optimized the main algorithms (Amplitudes.cc, PhaseSpace.cc, Profiles.cc, DenistyProfiles.cc)
   - Created a new namespace (Beam) that encompasses every object that deal with beams
   - Created the Stream object, an array of beam bunches at different z positions (Bunch)
@@ -520,6 +537,7 @@ Version **0.6.0**
   - Many bug fixes
 
 Version **0.5.2**
+
   - Optimized reweighting algorithm (ReweightBeam.cc)
   - Added tool to draw data-sim comparisons (PlotTools.hh)
   - Bug fixes
@@ -544,4 +562,3 @@ Version **0.5.0**:
   - Geometry handler
   - Beam line aperture handler
   - Beam plotting tools
-

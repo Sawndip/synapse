@@ -46,7 +46,7 @@ int main(int argc, char ** argv) {
   // Get the requested streams from the beam extractor
   Beam::Extractor ext(globals.GetDataFiles());
   std::string run_name = ext.GetRunName();
-  std::map<std::string, Beam::Stream> streams = ext.GetStreams(types, plane_ids);
+  std::map<std::string, Beam::Stream> streams = ext.GetStreams(types, plane_ids, globals["maxn"]);
 
   // Intialize the drawer and the info box
   Beam::Drawer drawer;
@@ -61,8 +61,7 @@ int main(int argc, char ** argv) {
 
   // Save the profiles
   std::vector<std::string> vars = {"x", "y", "px", "py", "pz"};
-  Pitch::print(Pitch::info, "The beam profiles will be output to profiles_"+run_name);
-  TFile *outfile = new TFile(TString::Format("profiles_%s.root", run_name.c_str()), "RECREATE");
+  TFile *outfile = new TFile("profiles_histograms.root", "RECREATE");
   outfile->cd();
   size_t ix, iy;
   for (const std::string& type : types) {
@@ -106,10 +105,10 @@ int main(int argc, char ** argv) {
   }
   outfile->Close();
 
-  // Move the plots to the relevant directory
-  Pitch::print(Pitch::info, "Moving the diagnostics graphs to "+run_name+"/profiles");
-  std::string sysCmd = "mkdir -p "+run_name+
-	"/profiles; mv profile*.pdf profile*.root "+run_name+"/profiles; done";
+  // Move the plots to the appropriate directory
+  Pitch::print(Pitch::info, "Moving the beam profiles to "+run_name+"/profiles");
+  std::string sysCmd = "mkdir -p "+run_name+"/profiles; "
+ 	"mv profile_*.pdf profiles_histograms.root "+run_name+"/profiles; done";
   if ( std::system(sysCmd.c_str()) )
       Pitch::print(Pitch::error, "Couldn't move the profile plots");
 }

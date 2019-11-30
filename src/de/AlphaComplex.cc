@@ -18,21 +18,21 @@ AlphaComplex::AlphaComplex(const std::vector<std::vector<double>>& points,
   }
 }
 
-AlphaComplex::AlphaComplex(const AlphaComplex& as) {
-  *this = as;
+AlphaComplex::AlphaComplex(const AlphaComplex& alc) {
+  *this = alc;
 }
 
-AlphaComplex& AlphaComplex::operator=(const AlphaComplex& as) {
-  if ( this == &as )
+AlphaComplex& AlphaComplex::operator=(const AlphaComplex& alc) {
+  if ( this == &alc )
       return *this;
 
-  _dim = as._dim;
-  _alpha = as._alpha;
-  _points = as._points;
-  _facets = as._facets;
-  _circumradii = as._circumradii;
-  _areas = as._areas;
-  _vol = as._vol;
+  _dim = alc._dim;
+  _alpha = alc._alpha;
+  _points = alc._points;
+  _facets = alc._facets;
+  _circumradii = alc._circumradii;
+  _areas = alc._areas;
+  _vol = alc._vol;
 
   return *this;
 }

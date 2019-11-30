@@ -10,6 +10,7 @@ set(EXECUTABLE_OUTPUT_PATH "${CMAKE_BINARY_DIR}/../bin")
 # Load some basic macros which alow to find the required modules
 include(		${CMAKE_BINARY_DIR}/FindMAUS.cmake)
 include(		${CMAKE_BINARY_DIR}/FindROOT.cmake)
+include(		${CMAKE_BINARY_DIR}/BuildDictionary.cmake)
 
 # C++ 11 flag
 set(CMAKE_CXX_FLAGS 	"${CMAKE_CXX_FLAGS} -std=c++0x -Wall -O3")

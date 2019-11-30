@@ -72,14 +72,50 @@ double Stream::Transmission(const size_t plane_id) const {
   return (double)_bunches.at(plane_id).Size()/size;
 }
 
-void Stream::SetCoreFraction(const double frac) {
+void Stream::SetCoreFraction(const double frac,
+		   	     const std::string fom) {
 
   // Find the amount of particles to be selected in the core
   size_t size = Front().Size()*frac;
   _fraction = frac;
 
   // Execute
-  SetCoreSize(size);
+  SetCoreSize(size, fom);
+}
+
+Variable Stream::Change(const SumStat& stat,
+		  	const size_t idu,
+		  	const size_t idd) const {
+
+  try {
+    // Check that the stream contains the requested plane ids
+    if ( !Contains(idu) || !Contains(idd) )
+        throw(Exceptions::Exception(Exceptions::nonRecoverable,
+	      "One of the plane ids involved in the comparison is missing",
+	      "Stream::Change"));
+
+    // Checks that idu is strictly upstream of idd
+    if ( _bunches.at(idu).Position() >= _bunches.at(idd).Position() )
+        throw(Exceptions::Exception(Exceptions::nonRecoverable,
+	      "The downstream reference plane is upstream",
+	      "Stream::Change"));
+
+    // Get the values upstream and downstream
+    Variable vu = _bunches.at(idu).SummaryStatistic(stat);
+    Variable vd = _bunches.at(idd).SummaryStatistic(stat);
+
+    // Evaluate the change and the uncertainty
+    double change = 100.*(vd.GetValue()/vu.GetValue()-1.);
+    double error = (100.+change)*sqrt(pow(vu.GetError()/vu.GetValue(), 2)+
+			       			pow(vd.GetError()/vd.GetValue(), 2));
+
+    return Variable(change, error);
+
+  } catch ( Exceptions::Exception& e ) {
+    throw(Exceptions::Exception(Exceptions::recoverable,
+	  "Could not evaluate the change",
+	  "Stream::Change"));
+  }
 }
 
 TGraphErrors* Stream::EvolutionGraph(const SumStat& stat) const {
@@ -204,7 +240,8 @@ std::map<SumStat, TGraphErrors*> Stream::FractionalGraphs(const size_t idu,
 	vd = _bunches.at(idd).SummaryStatistic(stat);
 
 	change = 100.*(vd.GetValue()/vu.GetValue()-1.);
-	error = change*sqrt(pow(vu.GetError()/vu.GetValue(), 2)+pow(vd.GetError()/vd.GetValue(), 2));
+	error = (100.+change)*sqrt(pow(vu.GetError()/vu.GetValue(), 2)+
+				   pow(vd.GetError()/vd.GetValue(), 2));
 
 	graphs[stat]->SetPoint(id, 100.*frac, change);
 	graphs[stat]->SetPointError(id, 0., error);
@@ -224,8 +261,8 @@ std::map<SumStat, TGraphErrors*> Stream::FractionalGraphs(const size_t idu,
     return graphs;
   } catch ( Exceptions::Exception& e ) {
     throw(Exceptions::Exception(Exceptions::recoverable,
-	  "Could not produce a evolution graph"+std::string(e.what()),
-	  "Stream::EvolutionGraph"));
+	  "Could not produce the fractional graphs"+std::string(e.what()),
+	  "Stream::FractionalGraphs"));
   }
 }
 
@@ -241,7 +278,7 @@ TF1* Stream::FractionalFunction(const SumStat& stat) const {
   double mass = Front().Mass();
   double dim = Front().Dimension();
 
-  // Set the parameters
+  // Set the function
   TF1* func = NULL;
   double R2 = TMath::ChisquareQuantile(_fraction, dim);
   if ( stat == amp ) {
@@ -254,6 +291,10 @@ TF1* Stream::FractionalFunction(const SumStat& stat) const {
     func = new TF1(("f"+SumStatDict[stat].name).c_str(),
 	"pow(TMath::Pi()*[0]*[1]*x, [2]/2)/TMath::Gamma([2]/2+1)", 0, 100);
     func->SetParameters(mass, R2, dim);
+  } else if ( stat == den ) {
+    func = new TF1(("f"+SumStatDict[stat].name).c_str(),
+	"exp(-[0]/2)/pow(2*TMath::Pi()*[1]*x, [2]/2)", 0, 100);
+    func->SetParameters(R2, mass, dim);
   }
 
   return func;
@@ -266,13 +307,14 @@ void Stream::Initialize() {
       _plane_ids.push_back(bunch.first);
 }
 
-void Stream::SetCoreSize(const size_t size) {
+void Stream::SetCoreSize(const size_t size,
+		   	 const std::string fom) {
 
   try {
     // Set the core size in each of the bunches
     for (const size_t& i : _plane_ids) {
       _bunches[i].SetFraction(_fraction);
-      _bunches[i].SetCoreSize(size);
+      _bunches[i].SetCoreSize(size, fom);
     }
 
   } catch ( Exceptions::Exception& e ) {

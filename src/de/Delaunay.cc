@@ -124,7 +124,7 @@ std::vector<TPolyLine*> Delaunay::Polygons() const {
   // Loop over the facets, define a polygon per facet
   std::vector<double> x, y;
   for (const std::pair<size_t, std::vector<Vertex>>& facet : _facets) {
-    
+
     x.resize(0);
     y.resize(0);
     for (const Vertex& vertex : facet.second) {

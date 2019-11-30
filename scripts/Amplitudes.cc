@@ -20,11 +20,9 @@
  */
 int main(int argc, char ** argv) {
 
-  // Reroot the info messages to the terminal for now
-  Pitch::setAnOutput(Pitch::info, std::cerr);
-
   // Amplitude algorithm global parameters (stored in globals)
   Globals &globals = Globals::GetInstance(argc, argv);
+  globals.CheckDataFiles("root");
 
   // Types and plane ids of the data to extract. Empty means import all (recmc and data)
   size_t inid((size_t)globals["tku_vid"]), outid((size_t)globals["tkd_vid"]);
@@ -40,7 +38,7 @@ int main(int argc, char ** argv) {
   // Get the requested streams from the beam extractor
   Beam::Extractor ext(globals.GetDataFiles());
   std::string run_name = ext.GetRunName();
-  std::map<std::string, Beam::Stream> streams = ext.GetStreams(types, plane_ids);
+  std::map<std::string, Beam::Stream> streams = ext.GetStreams(types, plane_ids, globals["maxn"]);
 
   // List of types of amplitudes to consider
   std::vector<std::string> locs = {"up", "down", "scrap"};
@@ -59,14 +57,6 @@ int main(int argc, char ** argv) {
       // Switch to corrected amplitudes
       if ( globals["mcd"] )
           streams[type][i].SetMCDAmplitudes();
-
-      // Switch to generalised amplitudes
-      if ( globals["generalised"] )
-          streams[type][i].SetGeneralisedAmplitudes(1./streams[type].Transmission(i));
-
-      // If the Voronoi volumes are requested, reconstruct them
-      if ( globals["voronoi"] )
-          streams[type][i].SetVoronoiVolumes();
     }
   }
 
@@ -86,7 +76,7 @@ int main(int argc, char ** argv) {
 	    graph->Write(graph->GetName());
 	  }
 	}
-      }  
+      }
     }
     outfile->Close();
   }
@@ -104,13 +94,12 @@ int main(int argc, char ** argv) {
   // Show the amplitude distributions and change in the sample
   TFile *outfile = new TFile(TString::Format("%s_amps.root", run_name.c_str()), "RECREATE");
   Pitch::print(Pitch::info, "Filling the amplitude distributions");
+  std::map<std::string, std::map<std::string, TH1F*>> amp_hists;
   std::map<std::string, THStack*> amp_stacks;
-  std::map<std::string, std::map<std::string, TH1F*>> amp_hists;	// Transverse amplitudes
   std::map<std::string, TH2F*> vamp_hists;
   std::map<std::string, TH1F*> ramp_hists, famp_hists;
   size_t nbins(20);
   size_t minamp(0), maxamp(100);
-//  size_t minamp(0), maxamp(5e7);
   for (const std::string& type : types) {
 
     // Initialize the amplitude change histogram and the histogram stack
@@ -128,8 +117,6 @@ int main(int argc, char ** argv) {
 
     amp_stacks[type] = new THStack(TString::Format("amp_stack_%s", type.c_str()),
 	";A_{#perp}  [mm]");
-//	"Transverse amplitude;V ln^{2}(#rho/#rho(0)) [mm^{2}MeV^{2}/c^{2}]");
-
 
     // Fill the amplitude vectors
     std::map<std::string, Vector<double>> amps;
@@ -159,7 +146,7 @@ int main(int argc, char ** argv) {
         for (i = 0; i < nbins+1; i++)
             edges[i] = minamp + pow((double)i/nbins, .5)*(maxamp-minamp);
         amp_hists[type][loc] = new TH1F(TString::Format("amp_%s_%s", loc.c_str(), type.c_str()),
-				        "", nbins, &edges[0]);        
+				        "", nbins, &edges[0]);
       }
 
       amp_hists[type][loc]->FillN(amps[loc].size(), &(amps[loc][0]), NULL);
@@ -199,25 +186,25 @@ int main(int argc, char ** argv) {
 
     // Set the bin labels according to the excess and significance
     if ( globals["significance"] ) {
-      int nup, ndown, ntotup(0), ntotdown(0);
+      int nup, ndw, ntotup(0), ntotdw(0);
       double frac, pval, signi;
       for (size_t i = 0; i < (size_t)amp_hists[type]["up"]->GetNbinsX(); i++) {
         nup = amp_hists[type]["up"]->GetBinContent(i+1);
         ntotup += nup;
-        ndown = amp_hists[type]["down"]->GetBinContent(i+1);
-        ntotdown += ndown;
-        frac = (double)(ndown-nup)/nup;
+        ndw = amp_hists[type]["down"]->GetBinContent(i+1);
+        ntotdw += ndw;
+        frac = (double)(ndw-nup)/nup;
         DPoisson pdf(nup);
-        pval= 1.-pdf.CDF(ndown);
-        signi = sqrt(2)*TMath::ErfInverse(2*TMath::Gamma(nup+1, ndown)-1);
+        pval= 1.-pdf.CDF(ndw);
+        signi = sqrt(2)*TMath::ErfInverse(2*TMath::Gamma(nup+1, ndw)-1);
         amp_hists[type]["up"]->GetXaxis()->SetBinLabel(i+1,
 	TString::Format("#splitline{#splitline{#DeltaN: %d}{%2.1f %%}}{%2.1f#sigma}",
-			ndown-nup, 100*frac, signi));
+			ndw-nup, 100*frac, signi));
       }
 
-      frac = (double)(ntotdown-ntotup)/ntotup;
+      frac = (double)(ntotdw-ntotup)/ntotup;
       DPoisson pdf(ntotup);
-      pval= 1.-pdf.CDF(ntotdown);
+      pval= 1.-pdf.CDF(ntotdw);
       signi = sqrt(2)*TMath::ErfInverse(1.-2*pval);
       Pitch::print(Pitch::info, "Total excess: "+std::to_string(100*frac)+" %");
       Pitch::print(Pitch::info, "Exess p-value: "+std::to_string(pval));
@@ -245,7 +232,7 @@ int main(int argc, char ** argv) {
     vamp_x->SetMarkerStyle(21);
     vamp_x->Write(vamp_x->GetName());
     vamp_x->Draw("P SAME");
- 
+
     drawer.GetInfoBox()->Draw();
     canv->SaveAs(std::string("vamps_"+type+".pdf").c_str());
     delete vamp_x;

@@ -261,7 +261,7 @@ double DGaus::Norm() const {
     f.SetParameters(&(pars[0]));
     return f.Integral(_lower[0], _upper[0], _lower[1], _upper[1], _lower[2], _upper[2]);
   }
-  
+
   // For higher dimensions, no function available in ROOT, only support uncorrelated
   // Check that the matrix is diagonal, if not, throw recoverable
   size_t i, j;

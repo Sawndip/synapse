@@ -19,6 +19,23 @@ ParticleIdentification::ParticleIdentification(const std::vector<std::string>& d
   }
 }
 
+ParticleIdentification::ParticleIdentification(const std::vector<std::string>& data_files,
+					       const std::vector<size_t>& ids,
+			 		       const double& mumin,
+			 		       const double& mumax,
+			 		       const size_t nentries) :
+  _method("tof"), _tof_ids(ids), _tof_params(0), _tof_dz(0.) {
+
+  
+  try {
+    InitializeTOFPeak(data_files, mumin, mumax, nentries);
+  } catch ( Exceptions::Exception& e ) {
+    throw(Exceptions::Exception(Exceptions::nonRecoverable,
+	  "Could not initialize the TOF method"+std::string(e.what()),
+	  "ParticleIdentification::ParticleIdentification"));
+  }
+}
+
 ParticleIdentification::ParticleIdentification(const std::vector<size_t>& ids,
 			 		       const double& mumin,
 			 		       const double& mumax) :
@@ -53,96 +70,17 @@ ParticleIdentification& ParticleIdentification::operator=(const ParticleIdentifi
 
 ParticleIdentification::~ParticleIdentification () {}
 
-void ParticleIdentification::InitializeTOF(std::vector<std::string> data_files, size_t nentries) {
+void ParticleIdentification::InitializeTOF(std::vector<std::string> data_files,
+					   size_t nentries) {
 
-  // Set the method
-  Pitch::print(Pitch::info, "Fitting the time-of-flight TOF"+std::to_string(_tof_ids[0])
-			    +"->"+std::to_string(_tof_ids[1])+" for PID ("
-			    +std::to_string(nentries)+" requested)");
+  // Get the distance between the TOFs from the geometry
+  Globals &globals = Globals::GetInstance();
+  const GeometryHandler& geoh = globals.GetGeometryHandler();
+  _tof_dz = geoh["tof"+std::to_string((int)_tof_ids[1])].z()-
+	    geoh["tof"+std::to_string((int)_tof_ids[0])].z();
 
-  // Counter for the number of particles found so far
-  ProgressBar pbar;
-  size_t n(0);
-
-  // Container for all the time of flights
-  std::vector<double> tof;
-  _tof_dz = 0.;
-
-  for (size_t iFile = 0; iFile < data_files.size(); iFile++) {
-    // Set up the ROOT file and data pointer
-    TFile data_file(data_files[iFile].c_str()); // Load the MAUS output file
-    if ( !data_file.IsOpen() )
-        throw(Exceptions::Exception(Exceptions::nonRecoverable,
-	      "Data file not found: "+data_files[iFile],
-	      "ParticleIdentification::InitializeTOF"));
-    TTree *T = (TTree*)data_file.Get("Spill");	// Pull out the TTree
-    MAUS::Data *data_ptr = new MAUS::Data(); 	// A variable to store the Data from each spill
-    T->SetBranchAddress("data", &data_ptr);  	// Set the address of data_ptr
-
-    // Loop over the spills, get the recon events
-    for (size_t i = 0; i < (size_t)T->GetEntries(); ++i) {
-
-      // Update the spill pointed to by data_ptr
-      T->GetEntry(i);  
-      MAUS::Spill* spill = data_ptr->GetSpill();  
-      if (spill == NULL || !(spill->GetDaqEventType() == "physics_event"))
-	  continue;
-      std::vector<MAUS::ReconEvent*>* revts = spill->GetReconEvents();
-
-      // Loop over recon events in spill
-      for ( size_t ev = 0; ev < revts->size(); ++ev ) {
-        if ( !revts->at(ev) )
-	      continue;
-
-	// Etract TOF space points
-        MAUS::TOFEvent *tofevent = revts->at(ev)->GetTOFEvent();
-        MAUS::TOFEventSpacePoint tofsp = tofevent->GetTOFEventSpacePoint();
-        std::vector<std::vector<MAUS::TOFSpacePoint>> tofsps = {tofsp.GetTOF0SpacePointArray(),
-							   	tofsp.GetTOF1SpacePointArray(),
-							  	tofsp.GetTOF2SpacePointArray()};
-
-	// Get the times and positions in each TOF, return if not a single SP
-  	std::vector<double> t(2);
-	bool found(true);
-  	size_t i;
-  	for (i = 0 ; i < _tof_ids.size(); i++) {
-    	  if ( tofsps[_tof_ids[i]].size() == 1 ) {
-      	    t[i] = tofsps[_tof_ids[i]][0].GetTime();
-    	  } else {
-      	    found = false;
-    	  }
-  	}
-	if ( !found )
-	    continue;
-
- 	// Skip absurd values of the time-of-flight (misreconstruction)
-        if ( t[1] - t[0] < 0 || t[1] - t[0] > 50 )
-	    continue;
-
-	// If the distance between TOFs is not yet known, extract it
-        if ( !_tof_dz )
-	    _tof_dz = tofsps[_tof_ids[1]][0].GetGlobalPosZ()
-			- tofsps[_tof_ids[0]][0].GetGlobalPosZ();
-
-        // Display the progress in %
-	pbar.GetProgress(n, nentries);
-
-	// Fill the TOF histogram and increment the count
-	tof.push_back(t[1] - t[0]);
-	
-	if ( ++n > nentries-1 )
-	    break;
-      }
-      if ( n > nentries-1 )
-	  break;
-    }
-    data_file.Close();
-    if ( n > nentries-1 )
-	break;
-  }
-  if ( n < nentries )
-      Pitch::print(Pitch::warning, "Requested number of particles not met ("+
-		   std::to_string(n)+"/"+std::to_string(nentries)+"), will attempt to fit");
+  // Get the array of TOFs
+  std::vector<double> tof = TOFs(data_files, 0, 50, nentries);
 
   // Find the time taken by a particle travelling at the speed of light
   double c = 299792458;			// [m/s]
@@ -158,7 +96,7 @@ void ParticleIdentification::InitializeTOF(std::vector<std::string> data_files, 
   // Define a histogram that will contain the time of flight profile
   // Bin width ~ 250 ps	(4*res)
   TH1F* htof = new TH1F(TString::Format("tof%d%d", (int)_tof_ids[0], (int)_tof_ids[1]),
-			TString::Format("Time-of-flight;TOF_{%d%d}",
+			TString::Format(";TOF_{%d%d}",
 			(int)_tof_ids[0], (int)_tof_ids[1]), nbins, min, max);
   htof->FillN(tof.size(), &(tof[0]), NULL);
 
@@ -222,10 +160,49 @@ void ParticleIdentification::InitializeTOF(std::vector<std::string> data_files, 
 	    "ParticleIdentification::InitializeTOF"));
 }
 
-int ParticleIdentification::GetID(MAUS::ReconEvent* event) const {
+void ParticleIdentification::InitializeTOFPeak(std::vector<std::string> data_files,
+					       const double& mumin,
+			   		       const double& mumax,
+			 		       const size_t nentries) {
+
+  // Get the distance between the TOFs from the geometry
+  Globals &globals = Globals::GetInstance();
+  const GeometryHandler& geoh = globals.GetGeometryHandler();
+  _tof_dz = geoh["tof"+std::to_string((int)_tof_ids[1])].z()-
+	    geoh["tof"+std::to_string((int)_tof_ids[0])].z();
+
+  // Find the time theoretical time taken by a particle travelling at the speed of light
+  double c = 299792458;			// [m/s]
+  double ct = 1e9*_tof_dz*1e-3/c; 	// [ns]
+
+  // Find the position of the electron peak
+  std::vector<double> tof = TOFs(data_files, ct-1, ct+1, nentries);
+  double peak = Math::Mean(tof);
+
+  // Set the distance from measured electron peak
+  _tof_dz = c*peak*1e-9;
+
+  // Draw histogram of the peak
+  TH1F* htof = new TH1F(TString::Format("tof%d%d", (int)_tof_ids[0], (int)_tof_ids[1]),
+			TString::Format(";TOF_{%d%d}",
+			(int)_tof_ids[0], (int)_tof_ids[1]), 20, ct-1, ct+1);
+  htof->FillN(tof.size(), &(tof[0]), NULL);
+
+  TCanvas *canv = new TCanvas("c", "c", 1200, 800);
+  htof->Draw();
+  canv->SaveAs(TString::Format("tof%d%d_epeak.pdf", (int)_tof_ids[0], (int)_tof_ids[1]));
+  delete canv;
+  delete htof;
+
+  // Set the limits
+  _tof_params.push_back(peak+mumin);
+  _tof_params.push_back(peak+mumax);
+}
+
+int ParticleIdentification::GetID(const double& fom) const {
 
   if ( _method == "tof" ) {
-    return GetTofID(event);
+    return GetTofID(fom);
   } 
     
   throw(Exceptions::Exception(Exceptions::recoverable,
@@ -234,33 +211,84 @@ int ParticleIdentification::GetID(MAUS::ReconEvent* event) const {
   return 0;
 }
 
-int ParticleIdentification::GetTofID(MAUS::ReconEvent* event) const {
-
-  // Extract TOF space points
-  MAUS::TOFEvent *tofevent = event->GetTOFEvent();
-  MAUS::TOFEventSpacePoint tofsp = tofevent->GetTOFEventSpacePoint();
-  std::vector<std::vector<MAUS::TOFSpacePoint>> tofsps = {tofsp.GetTOF0SpacePointArray(),
-							  tofsp.GetTOF1SpacePointArray(),
-							  tofsp.GetTOF2SpacePointArray()};
-
-  // Get the times and positions in each TOF, return if not a single SP
-  std::vector<double> t(2);
-  size_t i;
-  for (i = 0 ; i < _tof_ids.size(); i++) {
-    if ( tofsps[_tof_ids[i]].size() == 1 ) {
-      t[i] = tofsps[_tof_ids[i]][0].GetTime();
-    } else {
-      return 0;
-    }
-  }
+int ParticleIdentification::GetTofID(const double& tof) const {
 
   // Return whichever the particle hypothesis for whichever peak it is
-  double dt = t[1] - t[0]; 		// [ns], time-of-flight
-  if ( dt < _tof_params[0] ) {
+  if ( tof < _tof_params[0] ) {
     return 11;
-  } else if ( dt < _tof_params[1] ) {
+  } else if ( tof < _tof_params[1] ) {
     return 13;
   }
 
   return 211;
+}
+
+std::vector<double> ParticleIdentification::TOFs(const std::vector<std::string>& data_files,
+			   			 const double& min,
+			   			 const double& max,
+			   			 const size_t nentries) {
+
+  // Set the method
+  Pitch::print(Pitch::info, "Extracting the time-of-flight TOF"+std::to_string(_tof_ids[0])
+			    +"->"+std::to_string(_tof_ids[1])+" for PID ("
+			    +std::to_string(nentries)+" requested)");
+
+  // Counter for the number of particles found so far
+  ProgressBar pbar;
+  size_t n(0);
+
+  // Container for all the time of flights
+  std::vector<double> tof;
+  double t;
+
+  for (const std::string& file : data_files) {
+    // Set up the ROOT file and data pointer
+    TFile data_file(file.c_str()); // Load the MAUS output file
+    if ( !data_file.IsOpen() )
+        throw(Exceptions::Exception(Exceptions::nonRecoverable,
+	      "Data file not found: "+file,
+	      "ParticleIdentification::TOFs"));
+
+    TTree *T = (TTree*)data_file.Get("Track");	// Pull out the TTree
+    MiceTrack *track = NULL;	 		// A variable to store the data from each track
+    T->SetBranchAddress("Recon", &track);  	// Set the address of data_ptr
+
+    for (size_t i = 0; i < (size_t)T->GetEntries(); ++i) {
+
+      // Update the track pointed to by *track	
+      T->GetEntry(i);
+
+      // Skip if there is not exactly one SP in each TOF station
+      if ( track->tof_nsp[_tof_ids[0]] != 1 || track->tof_nsp[_tof_ids[1]] != 1 )
+	  continue;
+      t = track->t[_tof_ids[1]]-track->t[_tof_ids[0]];
+
+      // Skip times that do not fall inside the requested interval
+      if ( t < min || t > max )
+	  continue;
+
+      // Display the progress in %
+      pbar.GetProgress(n, nentries);
+
+      // Fill the TOF vector and increment the count
+      tof.push_back(t);
+	
+      if ( ++n > nentries-1 )
+	  break;
+    }
+
+    data_file.Close();
+    if ( n > nentries-1 )
+	break;
+  }
+
+  // Warn if the amount of particles requested is not met
+  if ( n < nentries ) {
+    pbar.GetProgress(nentries-1, nentries);
+    Pitch::print(Pitch::warning, "Requested number of particles requested not met ("+
+		 std::to_string(n)+"/"+std::to_string(nentries)+")",
+		 "ParticleIdentification::TOFs");
+  }
+
+  return tof;
 }
